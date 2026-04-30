@@ -4,10 +4,10 @@
   "description": "",
   "main": "script.js",
   "scripts": {
-    "start": "tsx src/index.ts",
+    "start": "node dist/index.js",
     "dev": "nodemon --exec tsx src/index.ts",
-    "build": "tsc",
-    "migrate": "prisma migrate deploy"
+    "build": "tsc && npx prisma generate",
+    "migrate": "npx prisma migrate deploy"
   },
   "repository": {
     "type": "module",
@@ -38,7 +38,6 @@
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui": "^5.32.5",
     "swagger-ui-express": "^5.0.1",
-    "tsc": "^2.0.4",
     "tsx": "^4.21.0",
     "typescript": "^6.0.3",
     "zod": "^4.3.6"
