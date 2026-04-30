@@ -6,7 +6,7 @@ export const getAllBookings = async (req: Request, res: Response) => {
   try {
     const bookings = await prisma.booking.findMany({
       include: {
-        guestById: true,
+        guest: true,
         listing: true,
       },
     });
@@ -34,7 +34,7 @@ export const getBookingById = async (req: Request, res: Response) => {
     const booking = await prisma.booking.findUnique({
       where: { id },
       include: {
-        guestById: true,
+        guest: true,
         listing: true,
       },
     });
@@ -44,28 +44,28 @@ export const getBookingById = async (req: Request, res: Response) => {
     }
 
     res.json(booking);
-  } catch (error) {
-    console.log(error);
-    res.status(500).json({ message: "Error fetching booking" });
-  }
-};
+      } catch (error) {
+      console.log(error);
+      res.status(500).json({ message: "Error fetching booking" });
+    }
+  };
 
-// GET bookings by user ID (guest)
-export const getUserBookings = async (req: Request, res: Response) => {
-  const guestId = Number(req.params.guestId);
+  // GET bookings by user ID (guest)
+  export const getUserBookings = async (req: Request, res: Response) => {
+    const guestId = Number(req.params.guestId);
 
-  if (isNaN(guestId)) {
-    return res.status(400).json({ message: "Invalid guest ID" });
-  }
+    if (isNaN(guestId)) {
+      return res.status(400).json({ message: "Invalid guest ID" });
+    }
 
-  try {
-    const bookings = await prisma.booking.findMany({
-      where: { guestId },
-      include: {
-        guestById: true,
-        listing: true,
-      },
-    });
+    try {
+      const bookings = await prisma.booking.findMany({
+        where: { guestId },
+        include: {
+          guest: true,
+          listing: true,
+        },
+      });
 
     if (!bookings || bookings.length === 0) {
       return res.status(404).json({ message: "No bookings found for this user" });
@@ -87,13 +87,13 @@ export const getListingBookings = async (req: Request, res: Response) => {
   }
 
   try {
-    const bookings = await prisma.booking.findMany({
-      where: { listingId },
-      include: {
-        guestById: true,
-        listing: true,
-      },
-    });
+      const bookings = await prisma.booking.findMany({
+        where: { listingId },
+        include: {
+          guest: true,
+          listing: true,
+        },
+      });
 
     if (!bookings || bookings.length === 0) {
       return res.status(404).json({ message: "No bookings found for this listing" });
@@ -148,13 +148,14 @@ export const createBooking = async (req: Request, res: Response) => {
     const newBooking = await prisma.booking.create({
       data: {
         checkIn: new Date(checkIn),
+        checkOut: new Date(new Date(checkIn).getTime() + 24 * 60 * 60 * 1000),
         totalPrice,
         status,
         guestId: Number(guestId),
         listingId: Number(listingId),
       },
       include: {
-        guestById: true,
+        guest: true,
         listing: true,
       },
     });
@@ -193,19 +194,19 @@ export const updateBooking = async (req: Request, res: Response) => {
       return res.status(400).json({ message: "totalPrice must be a positive number" });
     }
 
-    // Update booking
-    const updatedBooking = await prisma.booking.update({
-      where: { id },
-      data: {
-        ...(checkIn && { checkIn: new Date(checkIn) }),
-        ...(totalPrice && { totalPrice }),
-        ...(status && { status }),
-      },
-      include: {
-        guestById: true,
-        listing: true,
-      },
-    });
+      // Update booking
+      const updatedBooking = await prisma.booking.update({
+        where: { id },
+        data: {
+          ...(checkIn && { checkIn: new Date(checkIn) }),
+          ...(totalPrice && { totalPrice }),
+          ...(status && { status }),
+        },
+        include: {
+          guest: true,
+          listing: true,
+        },
+      });
 
     res.json({
       message: "Booking updated successfully",
@@ -263,6 +264,11 @@ export const updateBookingStatus = async (req: Request, res: Response) => {
     return res.status(400).json({ message: "Status is required and must be a string" });
   }
 
+  const validStatuses = ["pending", "confirmed", "cancelled"];
+  if (!validStatuses.includes(status)) {
+    return res.status(400).json({ message: `Status must be one of: ${validStatuses.join(", ")}` });
+  }
+
   try {
     // Check if booking exists
     const existingBooking = await prisma.booking.findUnique({
@@ -273,15 +279,15 @@ export const updateBookingStatus = async (req: Request, res: Response) => {
       return res.status(404).json({ message: "Booking not found" });
     }
 
-    // Update booking status
-    const updatedBooking = await prisma.booking.update({
-      where: { id },
-      data: { status },
-      include: {
-        guestById: true,
-        listing: true,
-      },
-    });
+      // Update booking status
+      const updatedBooking = await prisma.booking.update({
+        where: { id },
+        data: { status: status as any },
+        include: {
+          guest: true,
+          listing: true,
+        },
+      });
 
     res.json({
       message: "Booking status updated successfully",

@@ -1,8 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -11,60 +6,82 @@ datasource db {
   provider = "postgresql"
 }
 
-model User {
-  id        Int       @id @default(autoincrement())
-  email     String    @unique
-  password  String
-  username  String    @unique
-  avatar    String?
-  createdAt DateTime  @default(now())
-  bookings  Booking[]
+model user {
+  id               Int       @id @default(autoincrement())
+  name             String
+  email            String    @unique
+  username         String    @unique
+  phone            String?   @unique
+  role             Role
+  avatar           String?
+  bio              String?
+  password         String
+  resetToken       String?
+  resetTokenExpiry DateTime?
+  listings         listing[]
+  bookings         booking[]
+  reviews          review[]
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 }
 
-model Listing {
-  id             Int       @id @default(autoincrement())
-  title          String
-  location       String
-  pricePerNight  Float
-  guests         Int
-  createdAt      DateTime  @default(now())
-  bookings       Booking[]
-  
+model listing {
+  id            Int         @id @default(autoincrement())
+  title         String
+  description   String
+  location      String
+  pricePerNight Float
+  guests        Int
+  type          ListingType
+  amenities     String[]
+  photos        String[]
+  rating        Float?
+  hostId        Int
+  host          user        @relation(fields: [hostId], references: [id])
+  bookings      booking[]
+  reviews       review[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 }
 
-model Booking {
-  id          Int      @id @default(autoincrement())
-  checkIn     DateTime
-  totalPrice  Float
-  status      String
-  guestId     Int
-  listingId   Int
-  createdAt   DateTime @default(now())
-  guestById   User     @relation(fields: [guestId], references: [id])
-  listing     Listing  @relation(fields: [listingId], references: [id])
+model booking {
+  id         Int           @id @default(autoincrement())
+  checkIn    DateTime
+  checkOut   DateTime
+  totalPrice Float
+  status     BookingStatus @default(pending)
+  createdAt  DateTime      @default(now())
+  guest      user          @relation(fields: [guestId], references: [id])
+  guestId    Int
+  listing    listing       @relation(fields: [listingId], references: [id])
+  listingId  Int
 }
-enum BookingStatus {
-  PENDING
-  CONFIRMED
-  CANCELLED
+
+model review {
+  id        Int      @id @default(autoincrement())
+  rating    Float
+  comment   String?
+  userId    Int
+  listingId Int
+  user      user     @relation(fields: [userId], references: [id])
+  listing   listing  @relation(fields: [listingId], references: [id])
+  createdAt DateTime @default(now())
 }
-enum UserRole {
-  USER
-  ADMIN
+
+enum Role {
+  host
+  guest
 }
+
 enum ListingType {
-  APARTMENT
-  HOUSE
-  ROOM
-}
-enum PaymentMethod {
-  CREDIT_CARD
-  PAYPAL
-  STRIPE
-}
-enum  bookingStatus {
-  PENDING
-  CONFIRMED
-  CANCELLED
+  apartment
+  house
+  villa
+  cabin
 }
 
+enum BookingStatus {
+  pending
+  confirmed
+  cancelled
+}

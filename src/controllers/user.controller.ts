@@ -24,15 +24,20 @@ export const getUserById = async(req: Request, res: Response) => {
     return res.status(400).json({ message: "Invalid user ID" });
   }
 
-  const user = await prisma.user.findUnique({
-    where: { id }
-  });
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id }
+    });
 
-  if (!user) {
-    return res.status(404).json({ message: "User not found" });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json(user);
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: "Error fetching user" });
   }
-
-  res.json(user);
 };
 
 
@@ -48,24 +53,28 @@ export const createUser = async(req: Request, res: Response) => {
  try {
   const check = await prisma.user.findFirst({
     where: {
-      OR: [{email, username}]
+      OR: [{email}, {username}]
     }
   })
   if (check) {
-    return res.status(400).json({ message: "User with this email, username or phone already exists" });
+    return res.status(400).json({ message: "User with this email or username already exists" });
   }
   const salt = await bcrypt.genSalt(10);
   const hashedPassword= await bcrypt.hash(password, salt)
-   const newUser = await prisma.user.create({
-    data:{
-      email, username, avatar, password: hashedPassword
-    }
-  });
+    const newUser = await prisma.user.create({
+     data:{
+       email, username, avatar, password: hashedPassword, name: username, role: 'guest'
+     }
+   });
   res.status(201).json({ message: "User Created Successfully", newUser });
   sendEmail({ to: newUser.email, subject: "WELCOME", text: "Welcome to our app!" }).catch(console.error);
 
- } catch (error) {
-  console.log(error)
+ } catch (error: any) {
+  if (error.code === 'P2002') {
+    return res.status(409).json({ message: "User with this email or username already exists" });
+  }
+  console.error(error);
+  res.status(500).json({ message: "Internal server error" });
  }
 };
 

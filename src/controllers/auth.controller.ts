@@ -24,14 +24,14 @@ export const login = async (req: Request, res: Response) => {
 };
 
 export const register = async (req: Request, res: Response) => {
-    const { email, username, password } = req.body;
-    if (!email || !username || !password)
+    const { email, username, password,name,role } = req.body;
+    if (!email || !username || !password|| !name || !role  )
         return res.status(400).json({ message: "Email, username, and password are required" });
     try {
         const exists = await prisma.user.findFirst({ where: { OR: [{ email }, { username }] } });
         if (exists) return res.status(400).json({ message: "User already exists" });
         const hashed = await bcrypt.hash(password, 10);
-        const user = await prisma.user.create({ data: { email, username, password: hashed } });
+        const user = await prisma.user.create({ data: { email, username, password: hashed, name: username, role: 'guest' } });
         res.status(201).json({ message: "Registered successfully", user });
     } catch (error) {
         res.status(500).json({ message: "Error during registration" });
