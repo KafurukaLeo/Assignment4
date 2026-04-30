@@ -24,17 +24,4 @@ v1Router.use("/bookings", bookingsRoutes);
 v1Router.use("/reviews", reviewsRoutes);
 v1Router.use("/upload", uploadRoutes);
 
-// catch-all 404
-v1Router.use((req: Request, res: Response) => {
-  res.status(404).json({ error: "Route not found" });
-});
-
-// error handler middleware
-v1Router.use(
-  (err: Error, req: Request, res: Response, next: NextFunction) => {
-    console.error(err.stack);
-    res.status(500).json({ error: "Something went wrong" });
-  }
-);
-
 export default v1Router;
