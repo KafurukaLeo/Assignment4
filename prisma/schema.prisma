@@ -29,6 +29,7 @@ model Listing {
   guests         Int
   createdAt      DateTime  @default(now())
   bookings       Booking[]
+  
 }
 
 model Booking {
@@ -42,3 +43,28 @@ model Booking {
   guestById   User     @relation(fields: [guestId], references: [id])
   listing     Listing  @relation(fields: [listingId], references: [id])
 }
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
+enum UserRole {
+  USER
+  ADMIN
+}
+enum ListingType {
+  APARTMENT
+  HOUSE
+  ROOM
+}
+enum PaymentMethod {
+  CREDIT_CARD
+  PAYPAL
+  STRIPE
+}
+enum  bookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
+

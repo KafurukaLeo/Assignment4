@@ -1,5 +1,6 @@
 import { type Request, type Response } from "express";
 import prisma from "../config/prisma.js";
+import bcrypt from "bcryptjs";
 
 export const login = async (req: Request, res: Response) => {
     const { email, password } = req.body;
@@ -20,4 +21,35 @@ export const login = async (req: Request, res: Response) => {
         console.log(error);
         res.status(500).json({ message: "Error during login" });
     }
+};
+
+export const register = async (req: Request, res: Response) => {
+    const { email, username, password } = req.body;
+    if (!email || !username || !password)
+        return res.status(400).json({ message: "Email, username, and password are required" });
+    try {
+        const exists = await prisma.user.findFirst({ where: { OR: [{ email }, { username }] } });
+        if (exists) return res.status(400).json({ message: "User already exists" });
+        const hashed = await bcrypt.hash(password, 10);
+        const user = await prisma.user.create({ data: { email, username, password: hashed } });
+        res.status(201).json({ message: "Registered successfully", user });
+    } catch (error) {
+        res.status(500).json({ message: "Error during registration" });
+    }
+};
+
+export const changePassword = async (req: Request, res: Response) => {
+    res.json({ message: "Change password endpoint" });
+};
+
+export const resetPassword = async (req: Request, res: Response) => {
+    res.json({ message: "Reset password endpoint" });
+};
+
+export const forgotPassword = async (req: Request, res: Response) => {
+    res.json({ message: "Forgot password endpoint" });
+};
+
+export const me = async (req: Request, res: Response) => {
+    res.json({ message: "Authenticated user endpoint" });
 };

@@ -35,9 +35,11 @@ export const getUserById = async(req: Request, res: Response) => {
   res.json(user);
 };
 
+
 //  POST new user
 export const createUser = async(req: Request, res: Response) => {
-  const {  email, username, avator, password } = req.body;
+  const { email, username, avatar, password } = req.body;
+
 
   if (!email || !username || !password) {
     return res.status(400).json({ message: "Email, username, and password are required" });
@@ -52,18 +54,15 @@ export const createUser = async(req: Request, res: Response) => {
   if (check) {
     return res.status(400).json({ message: "User with this email, username or phone already exists" });
   }
-  const salt = await bcrypt.genSalt(20);
+  const salt = await bcrypt.genSalt(10);
   const hashedPassword= await bcrypt.hash(password, salt)
    const newUser = await prisma.user.create({
     data:{
-      email, username, avator, password: hashedPassword
+      email, username, avatar, password: hashedPassword
     }
   });
-  await sendEmail({to: newUser.email, subject: "WELCOME", text: "Welcome to our app!"});
-  if (!newUser) {
-    return res.status(500).json({ message: "Error creating user" });
-  }
-  res.status(201).json({message: "User Created Successfully",  newUser});
+  res.status(201).json({ message: "User Created Successfully", newUser });
+  sendEmail({ to: newUser.email, subject: "WELCOME", text: "Welcome to our app!" }).catch(console.error);
 
  } catch (error) {
   console.log(error)
@@ -90,9 +89,7 @@ export const updateUser = async(req: Request, res: Response) => {
     console.log(error);
     return res.status(500).json({ message: "Error updating user" });
   }
-};
-
-  
+};  
 
 
 // DELETE user
