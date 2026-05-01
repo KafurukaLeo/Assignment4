@@ -34,7 +34,7 @@ const options: swaggerJSDoc.Options = {
       },
     },
   },
-  apis: isProduction ? ["./dist/routes/v1/*.js"] : ["./src/routes/v1/*.ts"],
+  apis: isProduction ? ["./dist/src/routes/v1/*.js"] : ["./src/routes/v1/*.ts"],
 };
 
 const swaggerSpec = swaggerJSDoc(options);
