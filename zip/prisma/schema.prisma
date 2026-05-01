@@ -1,0 +1,104 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model user {
+  id               String    @id @default(uuid())
+  name             String
+  email            String    @unique
+  username         String    @unique
+  phone            String?   @unique
+  role             Role      @default(guest)
+  avatar           String?
+  bio              String?
+  password         String
+  resetToken       String?
+  resetTokenExpiry DateTime?
+  listings         listing[]
+  bookings         booking[]
+  reviews          review[]
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([role])
+}
+
+model listing {
+  id            String      @id @default(uuid())
+  title         String
+  description   String
+  location      String
+  pricePerNight Float
+  guests        Int
+  type          ListingType
+  amenities     String[]
+  photos        String[]
+  rating        Float?
+  hostId        String
+  host          user        @relation(fields: [hostId], references: [id])
+  bookings      booking[]
+  reviews       review[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([hostId])
+  @@index([location])
+  @@index([type])
+  @@index([pricePerNight])
+  @@index([type, location])
+}
+
+model booking {
+  id         String        @id @default(uuid())
+  checkIn    DateTime
+  checkOut   DateTime
+  totalPrice Float
+  status     BookingStatus @default(pending)
+  createdAt  DateTime      @default(now())
+  guest      user          @relation(fields: [guestId], references: [id])
+  guestId    String
+  listing    listing       @relation(fields: [listingId], references: [id])
+  listingId  String
+
+  @@index([guestId])
+  @@index([listingId])
+  @@index([status])
+  @@index([listingId, checkIn, checkOut])
+}
+
+model review {
+  id        String   @id @default(uuid())
+  rating    Float
+  comment   String?
+  userId    String
+  listingId String
+  user      user     @relation(fields: [userId], references: [id])
+  listing   listing  @relation(fields: [listingId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([listingId])
+}
+
+enum Role {
+  admin
+  host
+  guest
+}
+
+enum ListingType {
+  apartment
+  house
+  villa
+  cabin
+}
+
+enum BookingStatus {
+  pending
+  confirmed
+  cancelled
+}
