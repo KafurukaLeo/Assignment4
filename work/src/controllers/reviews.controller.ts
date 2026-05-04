@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
 import prisma from "../config/prisma";
+import { deleteCache } from "../config/catche";
 
 export const createReview = async (req: Request, res: Response) => {
   try {
@@ -21,6 +22,7 @@ export const createReview = async (req: Request, res: Response) => {
     });
 
     res.status(201).json({ success: true, data: review });
+    deleteCache(`review-summary:${listingId}`);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Failed to create review" });

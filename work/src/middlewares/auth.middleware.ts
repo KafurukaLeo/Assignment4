@@ -12,6 +12,7 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
   const authHeader = req.headers["authorization"];
 
   if (!authHeader?.startsWith("Bearer ")) {
+    res.setHeader("WWW-Authenticate", 'Bearer realm="api", error="missing_token"');
     return res.status(401).json({ error: "No token provided" });
   }
 
@@ -23,6 +24,7 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
     req.role = decoded.role;
     next();
   } catch {
+    res.setHeader("WWW-Authenticate", 'Bearer realm="api", error="invalid_token"');
     return res.status(401).json({ error: "Invalid or expired token" });
   }
 }

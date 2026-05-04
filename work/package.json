@@ -18,7 +18,7 @@
     "db:fresh": "prisma migrate reset"
   },
   "repository": {
-    "type": "module",
+    "type": "git",
     "url": "git+https://github.com/NIRoberto/node_guide.git"
   },
   "keywords": [],

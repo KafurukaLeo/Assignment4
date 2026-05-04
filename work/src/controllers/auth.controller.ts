@@ -32,7 +32,7 @@ export const register = async (req: Request, res: Response) => {
   try {
     const exists = await prisma.user.findFirst({ where: { OR: [{ email }, { username }] } });
     if (exists) {
-      return res.status(409).json({ error: "Email or username is already taken" });
+      return res.status(409).json({ error: "Email or username is already taken", conflict: exists.email === email ? "email" : "username" });
     }
 
     const hashed = await bcrypt.hash(password, 10);

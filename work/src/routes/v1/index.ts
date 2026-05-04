@@ -7,6 +7,7 @@ import reviewsRoutes from "./reviews.routes";
 import statsRoutes from "./stats.routes";
 import uploadRoutes from "./upload.routes";
 import { deprecatev1 } from "../../middlewares/deprecation.middleware";
+import aiRoutes from "./ai.routes";
 
 export const v1Router = Router();
 
@@ -19,5 +20,6 @@ v1Router.use("/bookings", bookingsRoutes);
 v1Router.use("/reviews", reviewsRoutes);
 v1Router.use("/upload", uploadRoutes);
 v1Router.use("/stats", statsRoutes);
+v1Router.use("/ai", aiRoutes);
 
 export default v1Router;

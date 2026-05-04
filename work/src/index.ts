@@ -12,6 +12,9 @@ import { errorHandler } from "./middlewares/errorHandler";
 const app = express();
 const PORT = Number(process.env["PORT"]) || 3000;
 
+// Middleware to read JSON body (VERY IMPORTANT)
+app.use(express.json());
+
 // Render terminates TLS/proxies requests before they reach Express.
 // Trusting one proxy avoids express-rate-limit throwing on X-Forwarded-For.
 app.set("trust proxy", 1);
