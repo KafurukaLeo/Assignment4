@@ -1,4 +1,6 @@
+// Express Router — creates a modular route handler for stats endpoints
 import { Router } from "express";
+// getStats controller — returns platform-wide counts and averages
 import { getStats } from "../../controllers/stats.controller";
 
 const router = Router();

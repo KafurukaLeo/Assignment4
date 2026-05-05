@@ -1,5 +1,8 @@
+// Express Router — creates a modular route handler for auth endpoints
 import { Router } from "express";
+// Auth controller functions for registration, login, and password management
 import { login, register, changePassword, resetPassword, forgotPassword, me } from "../../controllers/auth.controller";
+// authenticate middleware — verifies JWT token, required for protected routes like /me
 import { authenticate } from "../../middlewares/auth.middleware";
 
 /**

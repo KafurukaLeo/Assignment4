@@ -1,4 +1,6 @@
+// Express Router — creates a modular route handler for listing endpoints
 import { Router } from "express";
+// Listing controller functions for CRUD, search, and stats
 import {
   getAllListings,
   getListingById,
@@ -8,6 +10,7 @@ import {
   deleteListing,
   getListingStats,
 } from "../../controllers/listings.controller";
+// authenticate — verifies JWT token | requireHost — only hosts can create/edit/delete listings
 import { authenticate, requireHost } from "../../middlewares/auth.middleware";
 
 const router = Router();

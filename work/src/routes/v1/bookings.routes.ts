@@ -1,4 +1,6 @@
+// Express Router — creates a modular route handler for booking endpoints
 import { Router } from "express";
+// Booking controller functions for CRUD and status management
 import {
   getAllBookings,
   getBookingById,
@@ -7,6 +9,7 @@ import {
   deleteBooking,
   updateBookingStatus,
 } from "../../controllers/bookings.controller";
+// authenticate — verifies JWT token | requireGuest — only guests can create bookings
 import { authenticate, requireGuest } from "../../middlewares/auth.middleware";
 
 const router = Router();

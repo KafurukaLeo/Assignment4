@@ -1,4 +1,6 @@
+// Express Router — creates a modular route handler for review endpoints
 import { Router } from "express";
+// Review controller functions for CRUD operations
 import {
   createReview,
   getReviews,
@@ -6,7 +8,7 @@ import {
   deleteReview,
   updateReview,
 } from "../../controllers/reviews.controller";
-
+// authenticate middleware — verifies JWT token for protected routes
 import { authenticate } from "../../middlewares/auth.middleware";
 
 const router = Router();

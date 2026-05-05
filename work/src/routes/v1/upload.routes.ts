@@ -1,6 +1,10 @@
+// Express Router — creates a modular route handler for upload endpoints
 import { Router } from 'express';
+// Multer middleware — handles multipart/form-data file uploads (stores in memory)
 import upload from "../../config/multer";
+// uploadAvatar controller — uploads file to Cloudinary and saves URL to user profile
 import { uploadAvatar } from "../../controllers/upload.controller";
+// authenticate middleware — user must be logged in to upload files
 import { authenticate } from "../../middlewares/auth.middleware";
 
 

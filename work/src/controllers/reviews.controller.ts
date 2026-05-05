@@ -2,6 +2,14 @@ import type { Request, Response } from "express";
 import prisma from "../config/prisma";
 import { deleteCache } from "../config/catche";
 
+/**
+ * POST /api/v1/reviews
+ * Creates a new review for a listing.
+ * - Required fields: userId, listingId, rating
+ * - Rating must be between 1 and 5
+ * - Clears the AI review summary cache for this listing after creation
+ *   so the next call to GET /ai/listings/:id/review-summary gets fresh data
+ */
 export const createReview = async (req: Request, res: Response) => {
   try {
     const { userId, listingId, rating, comment } = req.body as {
@@ -22,6 +30,9 @@ export const createReview = async (req: Request, res: Response) => {
     });
 
     res.status(201).json({ success: true, data: review });
+
+    // Clear the cached AI review summary for this listing
+    // so the next summary request reflects the new review
     deleteCache(`review-summary:${listingId}`);
   } catch (error) {
     console.error(error);
@@ -29,6 +40,11 @@ export const createReview = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * GET /api/v1/reviews
+ * Returns all reviews ordered by most recent first.
+ * - Includes user and listing details for each review
+ */
 export const getReviews = async (req: Request, res: Response) => {
   try {
     const reviews = await prisma.review.findMany({
@@ -42,6 +58,12 @@ export const getReviews = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * GET /api/v1/reviews/:id
+ * Returns a single review by its ID.
+ * - Includes user and listing details
+ * - Returns 404 if review doesn't exist
+ */
 export const getReviewById = async (req: Request, res: Response) => {
   const id = req.params["id"] as string;
 
@@ -58,6 +80,12 @@ export const getReviewById = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * PUT /api/v1/reviews/:id
+ * Updates an existing review.
+ * - Both rating and comment are optional — only provided fields are updated
+ * - Returns 404 if review doesn't exist
+ */
 export const updateReview = async (req: Request, res: Response) => {
   const id = req.params["id"] as string;
   const { rating, comment } = req.body as { rating?: number; comment?: string };
@@ -66,6 +94,7 @@ export const updateReview = async (req: Request, res: Response) => {
     const review = await prisma.review.findUnique({ where: { id } });
     if (!review) return res.status(404).json({ error: "Review not found" });
 
+    // Keep existing values for fields not provided in the request
     const updated = await prisma.review.update({
       where: { id },
       data: {
@@ -81,6 +110,11 @@ export const updateReview = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * DELETE /api/v1/reviews/:id
+ * Permanently deletes a review.
+ * - Returns 404 if review doesn't exist
+ */
 export const deleteReview = async (req: Request, res: Response) => {
   const id = req.params["id"] as string;
 

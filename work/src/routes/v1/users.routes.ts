@@ -1,4 +1,6 @@
+// Express Router — creates a modular route handler for user endpoints
 import { Router } from "express";
+// User controller functions for CRUD operations
 import {
   getAllUsers,
   getUserById,
@@ -8,6 +10,7 @@ import {
   getCurrentUser,
   updateCurrentUser,
 } from "../../controllers/user.controller";
+// authenticate middleware — verifies JWT token for protected routes
 import { authenticate } from "../../middlewares/auth.middleware";
 
 const router = Router();
