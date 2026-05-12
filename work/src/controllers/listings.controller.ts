@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import prisma from "../config/prisma";
 import type { AuthRequest } from "../middlewares/auth.middleware";
 import { getCache, setCache, deleteCache } from "../config/catche";
+import { formatListing } from "../utils/listing";
 
 /**
  * GET /api/v1/listings
@@ -30,14 +31,19 @@ export async function getAllListings(req: Request, res: Response) {
       prisma.listing.count(),
     ]);
 
-    const result = { data: listings, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
+    const result = { 
+      data: listings.map(formatListing), 
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) } 
+    };
 
     // Cache the result for 60 seconds
     setCache(cacheKey, result, 60);
     res.json(result);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Error fetching listings" });
+    const errorDetails = error instanceof Error ? error.stack : String(error);
+    require('fs').appendFileSync('error.log', `[${new Date().toISOString()}] ${errorDetails}\n`);
+    console.error("Full error in getAllListings:", error);
+    res.status(500).json({ error: "Error fetching listings", details: error instanceof Error ? error.message : String(error) });
   }
 }
 
@@ -61,7 +67,7 @@ export async function getListingById(req: Request, res: Response) {
     });
 
     if (!listing) return res.status(404).json({ error: "Listing not found" });
-    res.json(listing);
+    res.json(formatListing(listing));
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Error fetching listing" });
@@ -84,7 +90,7 @@ export async function searchListings(req: Request, res: Response) {
 
     // Build dynamic where clause based on provided filters
     const where: Record<string, unknown> = {};
-    if (location) where["location"] = { contains: location as string, mode: "insensitive" };
+    if (location) where["location"] = { contains: location as string };
     if (type) where["type"] = type;
     if (minPrice || maxPrice) {
       where["pricePerNight"] = {
@@ -104,7 +110,10 @@ export async function searchListings(req: Request, res: Response) {
       prisma.listing.count({ where }),
     ]);
 
-    res.json({ data: listings, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } });
+    res.json({ 
+      data: listings.map(formatListing), 
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) } 
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Error searching listings" });
@@ -142,8 +151,9 @@ export async function createListing(req: AuthRequest, res: Response) {
         location,
         pricePerNight,
         guests,
-        type: type as "apartment" | "house" | "villa" | "cabin",
-        amenities: amenities ?? [],
+        type,
+        amenities: JSON.stringify(amenities ?? []),
+        photos: JSON.stringify([]), // Default empty array for photos
         hostId: req.userId!, // hostId comes from the authenticated user's JWT
       },
       include: { host: true },
@@ -152,7 +162,7 @@ export async function createListing(req: AuthRequest, res: Response) {
     // Invalidate cached listings and stats since data has changed
     deleteCache("listings:");
     deleteCache("listing_stats");
-    res.status(201).json(listing);
+    res.status(201).json(formatListing(listing));
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Error creating listing" });
@@ -198,8 +208,8 @@ export async function updateListing(req: AuthRequest, res: Response) {
         ...(location !== undefined && { location }),
         ...(pricePerNight !== undefined && { pricePerNight }),
         ...(guests !== undefined && { guests }),
-        ...(type !== undefined && { type: type as "apartment" | "house" | "villa" | "cabin" }),
-        ...(amenities !== undefined && { amenities }),
+        ...(type !== undefined && { type }),
+        ...(amenities !== undefined && { amenities: JSON.stringify(amenities) }),
       },
       include: { host: true },
     });
@@ -207,7 +217,7 @@ export async function updateListing(req: AuthRequest, res: Response) {
     // Invalidate cached listings and stats since data has changed
     deleteCache("listings:");
     deleteCache("listing_stats");
-    res.json(updated);
+    res.json(formatListing(updated));
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Error updating listing" });
@@ -272,28 +282,29 @@ export async function getListingStats(req: Request, res: Response) {
     const cached = getCache("listing_stats");
     if (cached) return res.json(cached);
 
-    const [totalListings, avgResult, byLocation, byType] = await Promise.all([
+    const [totalListings, avgResult, byType, byLocation] = await Promise.all([
       prisma.listing.count(),
       prisma.listing.aggregate({ _avg: { pricePerNight: true } }),
-      // Use raw SQL for richer per-location stats (avg, min, max price)
-      prisma.$queryRaw<LocationStat[]>`
-        SELECT
-          location,
-          COUNT(*)::int                                AS total,
-          ROUND(AVG("pricePerNight")::numeric, 2)::float AS avg_price,
-          MIN("pricePerNight")                         AS min_price,
-          MAX("pricePerNight")                         AS max_price
-        FROM listing
-        GROUP BY location
-        ORDER BY total DESC
-      `,
       prisma.listing.groupBy({ by: ["type"], _count: true }),
+      prisma.listing.groupBy({ 
+        by: ["location"], 
+        _count: true,
+        _avg: { pricePerNight: true },
+        _min: { pricePerNight: true },
+        _max: { pricePerNight: true }
+      }),
     ]);
 
     const stats = {
       totalListings,
       averagePrice: avgResult._avg.pricePerNight ?? 0,
-      byLocation,
+      byLocation: byLocation.map(i => ({
+        location: i.location,
+        total: i._count,
+        avg_price: i._avg.pricePerNight ?? 0,
+        min_price: i._min.pricePerNight ?? 0,
+        max_price: i._max.pricePerNight ?? 0
+      })),
       byType: (byType as TypeStat[]).map((i) => ({ type: i.type, count: i._count })),
     };
 

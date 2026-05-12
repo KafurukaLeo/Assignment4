@@ -2,6 +2,7 @@ import "dotenv/config";
 import express, { type Request, type Response, type NextFunction } from "express";
 import compression from "compression";
 import morgan from "morgan";
+import cors from "cors";
 import { connectDB } from "./config/prisma";
 import { connectRedis } from "./config/redis";
 import { setupSwagger } from "./config/swagger";
@@ -11,6 +12,14 @@ import { errorHandler } from "./middlewares/errorHandler";
 
 const app = express();
 const PORT = Number(process.env["PORT"]) || 3000;
+
+// Enable CORS for all origins (useful for local development)
+app.use(
+  cors({
+    origin: true, // Reflects the request origin, allowing any origin to access with credentials
+    credentials: true,
+  })
+);
 
 // Parse incoming JSON request bodies — must be before any routes
 app.use(express.json());
@@ -81,3 +90,5 @@ if (require.main === module) {
 }
 
 export default app;
+ 
+ 

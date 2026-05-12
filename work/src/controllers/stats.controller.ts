@@ -40,3 +40,114 @@ export const getStats = async (req: Request, res: Response) => {
     });
   }
 };
+
+/**
+ * GET /api/v1/stats/dashboard
+ * Returns role-specific dashboard statistics.
+ * - Admin: Platform-wide stats
+ * - Host: Stats for their listings and bookings
+ * - Guest: Stats for their bookings and reviews
+ */
+export const getDashboardStats = async (req: any, res: Response) => {
+  try {
+    const { userId, role } = req;
+
+    if (role === "admin") {
+      const [totalUsers, totalListings, totalBookings, totalRevenue] = await Promise.all([
+        prisma.user.count(),
+        prisma.listing.count(),
+        prisma.booking.count(),
+        prisma.booking.aggregate({ _sum: { totalPrice: true } }),
+      ]);
+
+      const recentBookings = await prisma.booking.findMany({
+        take: 5,
+        orderBy: { createdAt: "desc" },
+        include: { listing: { select: { title: true } }, guest: { select: { name: true } } },
+      });
+
+      const topListings = await prisma.listing.findMany({
+        take: 5,
+        orderBy: { bookings: { _count: "desc" } },
+        include: { _count: { select: { bookings: true } } },
+      });
+
+      return res.json({
+        totalUsers,
+        totalListings,
+        totalBookings,
+        totalRevenue: totalRevenue._sum.totalPrice || 0,
+        recentBookings,
+        topListings,
+      });
+    }
+
+    if (role === "host") {
+      const [listingsCount, bookingsCount, revenue, avgRating] = await Promise.all([
+        prisma.listing.count({ where: { hostId: userId } }),
+        prisma.booking.count({ where: { listing: { hostId: userId } } }),
+        prisma.booking.aggregate({
+          where: { listing: { hostId: userId }, status: "confirmed" },
+          _sum: { totalPrice: true },
+        }),
+        prisma.review.aggregate({
+          where: { listing: { hostId: userId } },
+          _avg: { rating: true },
+        }),
+      ]);
+
+      const recentBookings = await prisma.booking.findMany({
+        where: { listing: { hostId: userId } },
+        take: 5,
+        orderBy: { createdAt: "desc" },
+        include: { listing: { select: { title: true } }, guest: { select: { name: true } } },
+      });
+
+      const topListings = await prisma.listing.findMany({
+        where: { hostId: userId },
+        take: 5,
+        orderBy: { bookings: { _count: "desc" } },
+        include: { _count: { select: { bookings: true } } },
+      });
+
+      return res.json({
+        totalListings: listingsCount,
+        totalBookings: bookingsCount,
+        totalRevenue: revenue._sum.totalPrice || 0,
+        averageRating: avgRating._avg.rating || 0,
+        recentBookings,
+        topListings,
+      });
+    }
+
+    if (role === "guest") {
+      const [bookingsCount, totalSpent, reviewsCount] = await Promise.all([
+        prisma.booking.count({ where: { guestId: userId } }),
+        prisma.booking.aggregate({
+          where: { guestId: userId, status: "confirmed" },
+          _sum: { totalPrice: true },
+        }),
+        prisma.review.count({ where: { userId: userId } }),
+      ]);
+
+      const recentBookings = await prisma.booking.findMany({
+        where: { guestId: userId },
+        take: 5,
+        orderBy: { createdAt: "desc" },
+        include: { listing: { select: { title: true, location: true, photos: true } } },
+      });
+
+      return res.json({
+        totalBookings: bookingsCount,
+        totalSpent: totalSpent._sum.totalPrice || 0,
+        totalReviews: reviewsCount,
+        recentBookings,
+      });
+    }
+
+    res.status(403).json({ error: "Unauthorized role" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to fetch dashboard stats" });
+  }
+};

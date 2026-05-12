@@ -3,7 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
 }
 
 model user {
@@ -12,7 +13,7 @@ model user {
   email            String    @unique
   username         String    @unique
   phone            String?   @unique
-  role             Role      @default(guest)
+  role             String    @default("guest")
   avatar           String?
   bio              String?
   password         String
@@ -21,6 +22,8 @@ model user {
   listings         listing[]
   bookings         booking[]
   reviews          review[]
+  sentMessages     message[] @relation("SentMessages")
+  receivedMessages message[] @relation("ReceivedMessages")
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
@@ -34,14 +37,15 @@ model listing {
   location      String
   pricePerNight Float
   guests        Int
-  type          ListingType
-  amenities     String[]
-  photos        String[]
+  type          String
+  amenities     String
+  photos        String
   rating        Float?
   hostId        String
   host          user        @relation(fields: [hostId], references: [id])
   bookings      booking[]
   reviews       review[]
+  messages      message[]
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
@@ -57,7 +61,7 @@ model booking {
   checkIn    DateTime
   checkOut   DateTime
   totalPrice Float
-  status     BookingStatus @default(pending)
+  status     String        @default("pending")
   createdAt  DateTime      @default(now())
   guest      user          @relation(fields: [guestId], references: [id])
   guestId    String
@@ -84,21 +88,19 @@ model review {
   @@index([listingId])
 }
 
-enum Role {
-  admin
-  host
-  guest
-}
+model message {
+  id         String   @id @default(uuid())
+  content    String
+  senderId   String
+  receiverId String
+  listingId  String?
+  createdAt  DateTime @default(now())
+  sender     user     @relation("SentMessages", fields: [senderId], references: [id])
+  receiver   user     @relation("ReceivedMessages", fields: [receiverId], references: [id])
+  listing    listing? @relation(fields: [listingId], references: [id])
 
-enum ListingType {
-  apartment
-  house
-  villa
-  cabin
-}
-
-enum BookingStatus {
-  pending
-  confirmed
-  cancelled
+  @@index([senderId])
+  @@index([receiverId])
+  @@index([listingId])
+  @@index([createdAt])
 }

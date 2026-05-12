@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import prisma from "../config/prisma";
 import { deleteCache } from "../config/catche";
+import { formatListing } from "../utils/listing";
 
 /**
  * POST /api/v1/reviews
@@ -29,7 +30,7 @@ export const createReview = async (req: Request, res: Response) => {
       include: { user: true, listing: true },
     });
 
-    res.status(201).json({ success: true, data: review });
+    res.status(201).json({ success: true, data: { ...review, listing: formatListing(review.listing) } });
 
     // Clear the cached AI review summary for this listing
     // so the next summary request reflects the new review
@@ -51,7 +52,7 @@ export const getReviews = async (req: Request, res: Response) => {
       include: { user: true, listing: true },
       orderBy: { createdAt: "desc" },
     });
-    res.json({ success: true, count: reviews.length, data: reviews });
+    res.json({ success: true, count: reviews.length, data: reviews.map(r => ({ ...r, listing: formatListing(r.listing) })) });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Failed to fetch reviews" });
@@ -73,7 +74,7 @@ export const getReviewById = async (req: Request, res: Response) => {
       include: { user: true, listing: true },
     });
     if (!review) return res.status(404).json({ error: "Review not found" });
-    res.json({ success: true, data: review });
+    res.json({ success: true, data: { ...review, listing: formatListing(review.listing) } });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Error fetching review" });
@@ -103,7 +104,7 @@ export const updateReview = async (req: Request, res: Response) => {
       },
       include: { user: true, listing: true },
     });
-    res.json({ success: true, data: updated });
+    res.json({ success: true, data: { ...updated, listing: formatListing(updated.listing) } });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Failed to update review" });

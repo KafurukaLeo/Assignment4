@@ -3,6 +3,7 @@ import prisma from "../config/prisma";
 import { model } from "../config/ai";
 import type { AuthRequest } from "../middlewares/auth.middleware";
 import { getCache, setCache } from "../config/catche";
+import { formatListing } from "../utils/listing";
 
 // Session interface for the chatbot — stores listing context and conversation history
 interface Session {
@@ -90,7 +91,7 @@ export const smartSearch = async (req: AuthRequest, res: Response) => {
 
     // Build Prisma where clause from extracted filters
     const where: any = {};
-    if (filters.location) where.location = { contains: filters.location, mode: "insensitive" };
+    if (filters.location) where.location = { contains: filters.location };
     if (filters.type) where.type = filters.type;
     if (filters.maxPrice) where.pricePerNight = { lte: filters.maxPrice };
     if (filters.guests) where.guests = { gte: filters.guests };
@@ -101,7 +102,11 @@ export const smartSearch = async (req: AuthRequest, res: Response) => {
       prisma.listing.count({ where }),
     ]);
 
-    res.status(200).json({ filters, data: listings, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } });
+    res.status(200).json({ 
+      filters, 
+      data: listings.map(formatListing), 
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) } 
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Something went wrong" });
@@ -156,7 +161,7 @@ export const generateDescription = async (req: AuthRequest, res: Response) => {
       include: { host: { select: { name: true, email: true } } },
     });
 
-    res.status(200).json({ description: generatedDescription, listing: updatedListing });
+    res.status(200).json({ description: generatedDescription, listing: formatListing(updatedListing) });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Something went wrong" });
@@ -188,19 +193,21 @@ export const chat = async (req: AuthRequest, res: Response) => {
     }
 
     // If a new listingId is provided, fetch that listing and reset history
-    if (listingId && session.listingId !== listingId) {
+    if (session.listing && session.listingId !== listingId) {
       session.listingId = listingId;
       session.history = [];
-      session.listing = await prisma.listing.findUnique({ where: { id: listingId } }) || null;
+      const rawListing = await prisma.listing.findUnique({ where: { id: listingId } });
+      session.listing = formatListing(rawListing);
     } else if (listingId && !session.listing) {
       // Listing ID is the same but listing data wasn't fetched yet
-      session.listing = await prisma.listing.findUnique({ where: { id: listingId } }) || null;
+      const rawListing = await prisma.listing.findUnique({ where: { id: listingId } });
+      session.listing = formatListing(rawListing);
     }
 
     // Build system prompt — if listing context exists, include its details
     let systemPrompt = "You are a helpful guest support assistant for an Airbnb-like platform.\nAnswer general questions about the platform and help with common inquiries.";
     if (session.listing) {
-      const amenities = Array.isArray(session.listing.amenities) ? session.listing.amenities.join(", ") : session.listing.amenities || "None";
+      const amenities = Array.isArray(session.listing.amenities) ? session.listing.amenities.join(", ") : "None";
       systemPrompt = `You are a helpful guest support assistant for an Airbnb-like platform.
 You are currently helping a guest with questions about this specific listing:
 Title: ${session.listing.title} | Location: ${session.listing.location} | Price: $${session.listing.pricePerNight}/night | Guests: ${session.listing.guests} | Type: ${session.listing.type} | Amenities: ${amenities}
@@ -395,7 +402,7 @@ Return ONLY JSON in this exact format:
     const where: any = { id: { notIn: bookedListingIds } };
     const filters = aiAnalysis.searchFilters ?? {};
 
-    if (filters.location) where.location = { contains: filters.location, mode: "insensitive" };
+    if (filters.location) where.location = { contains: filters.location };
     if (filters.type) where.type = filters.type;
     if (filters.maxPrice != null) where.pricePerNight = { lte: filters.maxPrice };
     if (filters.guests != null) where.guests = { gte: filters.guests };
@@ -411,7 +418,7 @@ Return ONLY JSON in this exact format:
       preferences: aiAnalysis.preferences,
       reason: aiAnalysis.reason,
       searchFilters: aiAnalysis.searchFilters,
-      recommendations,
+      recommendations: recommendations.map(formatListing),
     });
   } catch (error) {
     console.error(error);

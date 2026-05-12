@@ -1,11 +1,9 @@
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
-import { PrismaPg } from "@prisma/adapter-pg";
 import bcrypt from "bcryptjs";
 import { faker } from "@faker-js/faker";
 
-const adapter = new PrismaPg({ connectionString: process.env["DATABASE_URL"] as string });
-const prisma = new PrismaClient({ adapter });
+const prisma = new PrismaClient();
 
 const LISTING_TYPES = ["apartment", "house", "villa", "cabin"] as const;
 const BOOKING_STATUSES = ["pending", "confirmed", "cancelled"] as const;
@@ -28,10 +26,9 @@ async function main() {
   const hashedPassword = await bcrypt.hash("password123", 10);
 
   // 3. Create 100 users (30 hosts, 70 guests) using upsert
-  //    Deterministic emails ensure running the seed twice never creates duplicates
   const users = [];
   for (let i = 0; i < 100; i++) {
-    const role: "host" | "guest" = i < 30 ? "host" : "guest";
+    const role = i < 30 ? "host" : "guest";
     const user = await prisma.user.upsert({
       where: { email: `seed.user${i}@example.com` },
       update: {},
@@ -51,7 +48,7 @@ async function main() {
   const guests = users.slice(30);
   console.log(`Created ${users.length} users (${hosts.length} hosts, ${guests.length} guests)`);
 
-  // 4. Create 100 listings — individual creates so we capture IDs for bookings
+  // 4. Create 100 listings
   const listings = [];
   for (let i = 0; i < 100; i++) {
     const listing = await prisma.listing.create({
@@ -62,10 +59,10 @@ async function main() {
         pricePerNight: parseFloat(faker.commerce.price({ min: 30, max: 600 })),
         guests: faker.number.int({ min: 1, max: 12 }),
         type: LISTING_TYPES[i % LISTING_TYPES.length]!,
-        amenities: faker.helpers.arrayElements(AMENITIES_POOL, faker.number.int({ min: 3, max: 7 })),
-        photos: Array.from({ length: faker.number.int({ min: 1, max: 4 }) }, () =>
-          faker.image.urlLoremFlickr({ category: "house" }),
-        ),
+        amenities: JSON.stringify(faker.helpers.arrayElements(AMENITIES_POOL, faker.number.int({ min: 3, max: 7 }))),
+        photos: JSON.stringify(Array.from({ length: faker.number.int({ min: 1, max: 4 }) }, () =>
+          faker.image.urlLoremFlickr({ width: 640, height: 480, category: "house" }),
+        )),
         rating: parseFloat(faker.number.float({ min: 3, max: 5, fractionDigits: 1 }).toFixed(1)),
         hostId: hosts[i % hosts.length]!.id,
       },
@@ -74,7 +71,7 @@ async function main() {
   }
   console.log(`Created ${listings.length} listings`);
 
-  // 5. Create 100 bookings — each links a guest to a listing with calculated totalPrice
+  // 5. Create 100 bookings
   for (let i = 0; i < 100; i++) {
     const listing = listings[i % listings.length]!;
     const guest = guests[i % guests.length]!;
@@ -97,7 +94,7 @@ async function main() {
   }
   console.log("Created 100 bookings");
 
-  // 6. Create 100 reviews — spread across listings and users
+  // 6. Create 100 reviews
   for (let i = 0; i < 100; i++) {
     const listing = listings[i % listings.length]!;
     const user = users[i % users.length]!;
@@ -114,9 +111,6 @@ async function main() {
   console.log("Created 100 reviews");
 
   console.log("Seeding complete!");
-  console.log("All seed passwords: password123");
-  console.log("Host example:  seed.user0@example.com");
-  console.log("Guest example: seed.user30@example.com");
 }
 
 main()

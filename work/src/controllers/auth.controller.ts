@@ -4,6 +4,7 @@ import prisma from "../config/prisma";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import type { AuthRequest } from "../middlewares/auth.middleware";
+import { formatListing } from "../utils/listing";
 import { sendEmail } from "../config/email";
 import { welcomeEmail, passwordResetEmail } from "../templates/email";
 
@@ -37,17 +38,21 @@ export const register = async (req: Request, res: Response) => {
     return res.status(400).json({ error: "Password must be at least 8 characters" });
   }
 
-  // Only allow "host" or default to "guest" — prevents assigning "admin" via registration
-  const assignedRole = role === "host" ? "host" : "guest";
+  // Allow "host", "admin", or default to "guest"
+  const normalizedRole = role?.toLowerCase();
+  const assignedRole = (normalizedRole === "host" || normalizedRole === "admin") 
+    ? normalizedRole 
+    : "guest";
 
   try {
     // Check if email or username is already in use
-    const exists = await prisma.user.findUnique ({where: {email }});
+    const exists = await prisma.user.findFirst({
+      where: { OR: [{ email }, { username }] },
+    });
 
-    console.log(exists);
-    
     if (exists) {
-      return res.status(409).json({ error: "Email or username is already taken", conflict: exists.email === email ? "email" : "username" });
+      const conflict = exists.email === email ? "email" : "username";
+      return res.status(409).json({ error: `${conflict} is already taken`, conflict });
     }
 
     // Hash the password before storing — never store plain text passwords
@@ -148,7 +153,18 @@ export const me = async (req: AuthRequest, res: Response) => {
     }
 
     // Remove sensitive fields before sending response
-    const { password: _, resetToken: __, resetTokenExpiry: ___, ...userWithoutPassword } = user;
+    const { password: _, resetToken: __, resetTokenExpiry: ___, ...userWithoutPassword } = user as any;
+    
+    if (userWithoutPassword.listings) {
+      userWithoutPassword.listings = userWithoutPassword.listings.map(formatListing);
+    }
+    if (userWithoutPassword.bookings) {
+      userWithoutPassword.bookings = userWithoutPassword.bookings.map((b: any) => ({
+        ...b,
+        listing: formatListing(b.listing)
+      }));
+    }
+
     res.json(userWithoutPassword);
   } catch (error) {
     console.error(error);

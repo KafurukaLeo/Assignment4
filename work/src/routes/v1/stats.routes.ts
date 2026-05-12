@@ -1,7 +1,8 @@
 // Express Router — creates a modular route handler for stats endpoints
 import { Router } from "express";
 // getStats controller — returns platform-wide counts and averages
-import { getStats } from "../../controllers/stats.controller";
+import { getStats, getDashboardStats } from "../../controllers/stats.controller";
+import { authenticate } from "../../middlewares/auth.middleware";
 
 const router = Router();
 
@@ -43,5 +44,6 @@ const router = Router();
  *         description: Error fetching statistics
  */
 router.get("/", getStats);
+router.get("/dashboard", authenticate, getDashboardStats);
 
 export default router;

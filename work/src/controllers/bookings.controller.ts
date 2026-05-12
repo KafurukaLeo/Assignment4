@@ -3,6 +3,7 @@ import prisma from "../config/prisma";
 import type { AuthRequest } from "../middlewares/auth.middleware";
 import { sendEmail } from "../config/email";
 import { bookingConfirmationEmail, bookingCancellationEmail } from "../templates/email";
+import { formatListing } from "../utils/listing";
 
 /**
  * GET /api/v1/bookings
@@ -29,7 +30,10 @@ export const getAllBookings = async (req: Request, res: Response) => {
       prisma.booking.count(),
     ]);
 
-    res.json({ data: bookings, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } });
+    res.json({ 
+      data: bookings.map(b => ({ ...b, listing: formatListing(b.listing) })), 
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) } 
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Error fetching bookings" });
@@ -52,7 +56,7 @@ export const getBookingById = async (req: Request, res: Response) => {
     });
 
     if (!booking) return res.status(404).json({ error: "Booking not found" });
-    res.json(booking);
+    res.json({ ...booking, listing: formatListing(booking.listing) });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Error fetching booking" });
@@ -87,7 +91,10 @@ export const getUserBookings = async (req: Request, res: Response) => {
       prisma.booking.count({ where: { guestId } }),
     ]);
 
-    res.json({ data: bookings, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } });
+    res.json({ 
+      data: bookings.map(b => ({ ...b, listing: formatListing(b.listing) })), 
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) } 
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Error fetching user bookings" });
@@ -167,7 +174,7 @@ export const createBooking = async (req: AuthRequest, res: Response) => {
       });
     });
 
-    res.status(201).json(booking);
+    res.status(201).json({ ...booking, listing: formatListing(booking.listing) });
 
     // Send confirmation email after responding — failure here doesn't affect the booking
     try {
@@ -286,7 +293,7 @@ export const updateBookingStatus = async (req: Request, res: Response) => {
       include: { guest: true, listing: true },
     });
 
-    res.json({ message: "Booking status updated successfully", data: updated });
+    res.json({ message: "Booking status updated successfully", data: { ...updated, listing: formatListing(updated.listing) } });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Error updating booking status" });
