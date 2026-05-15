@@ -2,8 +2,9 @@
   "compilerOptions": {
     "rootDir": "./",
     "outDir": "./dist",
-    "module": "commonjs",
-    "moduleResolution": "node10",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "ignoreDeprecations": "5.0",
     "target": "es2022",
     "types": ["node"],
     "esModuleInterop": true,
@@ -14,7 +15,7 @@
     "declarationMap": true,
 
     "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true,
+    "exactOptionalPropertyTypes": false,
 
     "strict": true,
     "isolatedModules": true,

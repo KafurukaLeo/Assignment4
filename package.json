@@ -6,6 +6,9 @@
     "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
     "dev:frontend": "npm run dev --prefix FRONTEN",
     "dev:backend": "npm run dev --prefix work",
+    "build": "npm run build:frontend && npm run build:backend",
+    "build:frontend": "npm run build --prefix FRONTEN",
+    "build:backend": "npm run build --prefix work",
     "install:all": "npm install --prefix FRONTEN && npm install --prefix work"
   },
   "devDependencies": {
