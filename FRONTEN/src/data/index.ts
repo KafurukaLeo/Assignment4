@@ -7,6 +7,8 @@ import {
   TreePine,
   MessageCircle,
   ShieldCheck,
+  UserCog,
+  Grid,
 } from "lucide-react";
 import type { CategoryProps } from "../types";
 
@@ -25,7 +27,7 @@ export const DashboardLinks = [
   { title: "Listing", url: "/dashboard/listings", badge: null, icon: Home },
   {
     title: "Messages",
-    url: "/dashboard/messages",
+    url: "/messages",
     badge: null,
     icon: MessageCircle,
   },
@@ -42,9 +44,19 @@ export const AdminLinks = [
     url: "/admin/approvals",
     icon: ShieldCheck,
   },
+  {
+    title: "User management",
+    url: "/admin/users",
+    icon: UserCog,
+  },
 ];
 
 export const Categories: CategoryProps[] = [
+  {
+    icon: Grid,
+    title: "All",
+    value: 0,
+  },
   {
     icon: Building2,
     title: "Villa",

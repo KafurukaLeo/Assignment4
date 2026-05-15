@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { MapPin, Search, ShieldCheck, Star } from "lucide-react";
 import SearchBar from "../SearchBar";
+import heroBg from "../../assets/hero_background.png";
 
 export default function Hero() {
   return (
@@ -42,7 +43,7 @@ export default function Hero() {
 
         <div className="relative min-h-[360px] bg-gray-100 dark:bg-white/[0.04] lg:min-h-full">
           <img
-            src="/image/hero-background.jpg"
+            src={heroBg}
             alt="Beautiful guest stay"
             className="h-full w-full object-cover"
           />

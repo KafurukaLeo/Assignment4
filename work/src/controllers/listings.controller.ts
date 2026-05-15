@@ -3,6 +3,7 @@ import prisma from "../config/prisma";
 import type { AuthRequest } from "../middlewares/auth.middleware";
 import { getCache, setCache, deleteCache } from "../config/catche";
 import { formatListing } from "../utils/listing";
+import { uploadToCloudinary, deleteFromCloudinary } from "../config/cloudinary";
 
 /**
  * GET /api/v1/listings
@@ -22,6 +23,7 @@ export async function getAllListings(req: Request, res: Response) {
     const cached = getCache(cacheKey);
     if (cached) return res.json(cached);
 
+    // Removed active status filter per user request ("bring back all listings")
     const [listings, total] = await Promise.all([
       prisma.listing.findMany({
         skip,
@@ -44,6 +46,38 @@ export async function getAllListings(req: Request, res: Response) {
     require('fs').appendFileSync('error.log', `[${new Date().toISOString()}] ${errorDetails}\n`);
     console.error("Full error in getAllListings:", error);
     res.status(500).json({ error: "Error fetching listings", details: error instanceof Error ? error.message : String(error) });
+  }
+}
+
+/**
+ * GET /api/v1/listings/me
+ * Returns all listings owned by the authenticated host.
+ * - Requires authentication
+ */
+export async function getMyListings(req: AuthRequest, res: Response) {
+  try {
+    const page = Math.max(1, parseInt((req.query["page"] as string) ?? "1", 10));
+    const limit = Math.max(1, parseInt((req.query["limit"] as string) ?? "10", 10));
+    const skip = (page - 1) * limit;
+
+    const [listings, total] = await Promise.all([
+      prisma.listing.findMany({
+        where: { hostId: req.userId! },
+        skip,
+        take: limit,
+        include: { reviews: true },
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.listing.count({ where: { hostId: req.userId! } }),
+    ]);
+
+    res.json({
+      data: listings.map(formatListing),
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Error fetching your listings" });
   }
 }
 
@@ -83,15 +117,15 @@ export async function getListingById(req: Request, res: Response) {
  */
 export async function searchListings(req: Request, res: Response) {
   try {
-    const { location, type, minPrice, maxPrice, guests } = req.query;
+    const { location, type, minPrice, maxPrice, guests, checkIn, checkOut } = req.query;
     const page = Math.max(1, parseInt((req.query["page"] as string) ?? "1", 10));
     const limit = Math.max(1, parseInt((req.query["limit"] as string) ?? "10", 10));
     const skip = (page - 1) * limit;
 
-    // Build dynamic where clause based on provided filters
+    // Removed active status filter per user request ("bring back all listings")
     const where: Record<string, unknown> = {};
     if (location) where["location"] = { contains: location as string };
-    if (type) where["type"] = type;
+    if (type) where["type"] = { contains: type as string };
     if (minPrice || maxPrice) {
       where["pricePerNight"] = {
         ...(minPrice ? { gte: parseFloat(minPrice as string) } : {}),
@@ -99,6 +133,28 @@ export async function searchListings(req: Request, res: Response) {
       };
     }
     if (guests) where["guests"] = { gte: parseInt(guests as string, 10) };
+
+    // FR-025: Filter out listings that are booked or blocked during the requested dates
+    if (checkIn && checkOut) {
+      const checkInDate = new Date(checkIn as string);
+      const checkOutDate = new Date(checkOut as string);
+
+      if (!isNaN(checkInDate.getTime()) && !isNaN(checkOutDate.getTime()) && checkInDate < checkOutDate) {
+        where["bookings"] = {
+          none: {
+            status: { in: ["confirmed", "pending"] },
+            checkIn: { lt: checkOutDate },
+            checkOut: { gt: checkInDate },
+          },
+        };
+        where["blockedDates"] = {
+          none: {
+            startDate: { lt: checkOutDate },
+            endDate: { gt: checkInDate },
+          },
+        };
+      }
+    }
 
     const [listings, total] = await Promise.all([
       prisma.listing.findMany({
@@ -130,18 +186,50 @@ export async function searchListings(req: Request, res: Response) {
  */
 export async function createListing(req: AuthRequest, res: Response) {
   try {
-    const { title, description, location, pricePerNight, guests, type, amenities } = req.body as {
-      title?: string;
-      description?: string;
-      location?: string;
-      pricePerNight?: number;
-      guests?: number;
-      type?: string;
-      amenities?: string[];
-    };
+    const { title, description, location, pricePerNight, guests, type, amenities, cancellationPolicy } = req.body;
 
-    if (!title || !description || !location || !pricePerNight || !guests || !type) {
-      return res.status(400).json({ error: "Missing required fields" });
+    // Parse numeric fields since they come as strings in multipart/form-data
+    const price = parseFloat(pricePerNight);
+    const guestCount = parseInt(guests, 10);
+
+    if (!title || !description || !location || isNaN(price) || isNaN(guestCount) || !type) {
+      return res.status(400).json({ 
+        message: "Missing required fields or invalid numeric values",
+        error: "Missing required fields" 
+      });
+    }
+
+    // Check host approval status
+    const user = await prisma.user.findUnique({
+      where: { id: req.userId! },
+      select: { hostStatus: true, role: true }
+    });
+
+    if (!user || (user.role === "host" && user.hostStatus !== "approved")) {
+      return res.status(403).json({ 
+        message: "Host account not approved. You cannot create listings until an admin approves your account.",
+        error: "Host account not approved" 
+      });
+    }
+
+    // Handle photo uploads to Cloudinary
+    const files = (req as any).files as Express.Multer.File[];
+    const photoUrls: string[] = [];
+    if (files && files.length > 0) {
+      for (const file of files) {
+        const { url } = await uploadToCloudinary(file.buffer, "airbnb/listings");
+        photoUrls.push(url);
+      }
+    }
+
+    // Parse amenities if it's a string (sent via FormData)
+    let finalAmenities = amenities;
+    if (typeof amenities === "string") {
+      try {
+        finalAmenities = JSON.parse(amenities);
+      } catch (e) {
+        finalAmenities = [];
+      }
     }
 
     const listing = await prisma.listing.create({
@@ -149,12 +237,14 @@ export async function createListing(req: AuthRequest, res: Response) {
         title,
         description,
         location,
-        pricePerNight,
-        guests,
+        pricePerNight: price,
+        guests: guestCount,
         type,
-        amenities: JSON.stringify(amenities ?? []),
-        photos: JSON.stringify([]), // Default empty array for photos
-        hostId: req.userId!, // hostId comes from the authenticated user's JWT
+        amenities: JSON.stringify(finalAmenities ?? []),
+        photos: JSON.stringify(photoUrls),
+        cancellationPolicy: cancellationPolicy ?? "flexible",
+        hostId: req.userId!,
+        status: "active", // Changed from draft to active for immediate visibility as requested by user before
       },
       include: { host: true },
     });
@@ -162,10 +252,16 @@ export async function createListing(req: AuthRequest, res: Response) {
     // Invalidate cached listings and stats since data has changed
     deleteCache("listings:");
     deleteCache("listing_stats");
-    res.status(201).json(formatListing(listing));
+    res.status(201).json({
+      message: "Listing created successfully",
+      ...formatListing(listing)
+    });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Error creating listing" });
+    console.error("Error creating listing:", error);
+    res.status(500).json({ 
+      message: "An internal server error occurred while creating the listing",
+      error: "Error creating listing" 
+    });
   }
 }
 
@@ -182,22 +278,52 @@ export async function updateListing(req: AuthRequest, res: Response) {
     const id = req.params["id"] as string;
 
     const listing = await prisma.listing.findUnique({ where: { id } });
-    if (!listing) return res.status(404).json({ error: "Listing not found" });
+    if (!listing) return res.status(404).json({ message: "Listing not found", error: "Listing not found" });
 
     // Only the host who owns this listing or an admin can edit it
     if (listing.hostId !== req.userId && req.role !== "admin") {
-      return res.status(403).json({ error: "You can only edit your own listings" });
+      return res.status(403).json({ message: "You can only edit your own listings", error: "Unauthorized" });
     }
 
-    const { title, description, location, pricePerNight, guests, type, amenities } = req.body as {
-      title?: string;
-      description?: string;
-      location?: string;
-      pricePerNight?: number;
-      guests?: number;
-      type?: string;
-      amenities?: string[];
-    };
+    const { title, description, location, pricePerNight, guests, type, amenities, cancellationPolicy, existingPhotos } = req.body;
+
+    // Parse numeric fields
+    const price = pricePerNight !== undefined ? parseFloat(pricePerNight) : undefined;
+    const guestCount = guests !== undefined ? parseInt(guests, 10) : undefined;
+
+    // Handle new photo uploads
+    const files = (req as any).files as Express.Multer.File[];
+    let photoUrls: string[] = [];
+    
+    // Start with existing photos if provided (as a JSON string from FormData)
+    if (existingPhotos) {
+      try {
+        photoUrls = JSON.parse(existingPhotos);
+      } catch (e) {
+        photoUrls = [];
+      }
+    } else {
+      // If no existingPhotos provided, keep what's currently in the DB
+      photoUrls = JSON.parse(listing.photos || "[]");
+    }
+
+    // Add new uploads
+    if (files && files.length > 0) {
+      for (const file of files) {
+        const { url } = await uploadToCloudinary(file.buffer, "airbnb/listings");
+        photoUrls.push(url);
+      }
+    }
+
+    // Parse amenities
+    let finalAmenities = amenities;
+    if (typeof amenities === "string") {
+      try {
+        finalAmenities = JSON.parse(amenities);
+      } catch (e) {
+        finalAmenities = undefined;
+      }
+    }
 
     // Only update fields that were actually provided in the request body
     const updated = await prisma.listing.update({
@@ -206,10 +332,12 @@ export async function updateListing(req: AuthRequest, res: Response) {
         ...(title !== undefined && { title }),
         ...(description !== undefined && { description }),
         ...(location !== undefined && { location }),
-        ...(pricePerNight !== undefined && { pricePerNight }),
-        ...(guests !== undefined && { guests }),
+        ...(price !== undefined && !isNaN(price) && { pricePerNight: price }),
+        ...(guestCount !== undefined && !isNaN(guestCount) && { guests: guestCount }),
         ...(type !== undefined && { type }),
-        ...(amenities !== undefined && { amenities: JSON.stringify(amenities) }),
+        ...(finalAmenities !== undefined && { amenities: JSON.stringify(finalAmenities) }),
+        ...(photoUrls.length > 0 && { photos: JSON.stringify(photoUrls) }),
+        ...(cancellationPolicy !== undefined && { cancellationPolicy }),
       },
       include: { host: true },
     });
@@ -217,10 +345,16 @@ export async function updateListing(req: AuthRequest, res: Response) {
     // Invalidate cached listings and stats since data has changed
     deleteCache("listings:");
     deleteCache("listing_stats");
-    res.json(formatListing(updated));
+    res.json({
+      message: "Listing updated successfully",
+      ...formatListing(updated)
+    });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Error updating listing" });
+    console.error("Error updating listing:", error);
+    res.status(500).json({ 
+      message: "An internal server error occurred while updating the listing",
+      error: "Error updating listing" 
+    });
   }
 }
 
@@ -314,5 +448,161 @@ export async function getListingStats(req: Request, res: Response) {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Error fetching listing stats" });
+  }
+}
+
+/**
+ * PATCH /api/v1/listings/:id/publish
+ * FR-021: Publishes (activates) a listing so it becomes discoverable by guests.
+ * - Requires authentication; only the listing owner (host) or admin can publish.
+ * - Changes status from "draft" → "active".
+ * PATCH /api/v1/listings/:id/unpublish
+ * - Changes status from "active" → "draft" (takes listing off-market).
+ */
+export async function publishListing(req: AuthRequest, res: Response) {
+  try {
+    const id = req.params["id"] as string;
+    const action = req.path.endsWith("unpublish") ? "draft" : "active";
+
+    const listing = await prisma.listing.findUnique({ where: { id } });
+    if (!listing) return res.status(404).json({ error: "Listing not found" });
+
+    if (listing.hostId !== req.userId && req.role !== "admin") {
+      return res.status(403).json({ error: "You can only publish your own listings" });
+    }
+
+    const updated = await prisma.listing.update({
+      where: { id },
+      data: { status: action },
+      include: { host: true },
+    });
+
+    deleteCache("listings:");
+    deleteCache("listing_stats");
+    res.json({ 
+      message: action === "active" ? "Listing published successfully" : "Listing unpublished successfully",
+      listing: formatListing(updated),
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Error updating listing status" });
+  }
+}
+
+/**
+ * FR-059: Recalculates the average rating for a listing based on all its reviews.
+ * Called internally by the reviews controller after any review create/update/delete.
+ * Updates the `rating` field on the listing record in the database.
+ */
+export async function recalculateListingRating(listingId: string): Promise<void> {
+  const result = await prisma.review.aggregate({
+    where: { listingId },
+    _avg: { rating: true },
+    _count: { rating: true },
+  });
+
+  const newRating = result._count.rating > 0 ? result._avg.rating : null;
+
+  await prisma.listing.update({
+    where: { id: listingId },
+    data: { rating: newRating },
+  });
+}
+
+/**
+ * POST /api/v1/listings/:id/blocked-dates
+ * FR-018: Block a date range for a listing.
+ * - Requires authentication; only the host or admin can block dates.
+ */
+export async function createBlockedDate(req: AuthRequest, res: Response) {
+  try {
+    const listingId = req.params["id"] as string;
+    const { startDate, endDate, reason } = req.body as { startDate?: string; endDate?: string; reason?: string };
+
+    if (!startDate || !endDate) return res.status(400).json({ error: "startDate and endDate are required" });
+
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    if (isNaN(start.getTime()) || isNaN(end.getTime()) || start >= end) {
+      return res.status(400).json({ error: "Invalid dates. startDate must be before endDate." });
+    }
+
+    const listing = await prisma.listing.findUnique({ where: { id: listingId } });
+    if (!listing) return res.status(404).json({ error: "Listing not found" });
+
+    if (listing.hostId !== req.userId && req.role !== "admin") {
+      return res.status(403).json({ error: "Only the host can block dates" });
+    }
+
+    // Check if the blocked dates overlap with any existing bookings
+    const conflict = await prisma.booking.findFirst({
+      where: {
+        listingId,
+        status: { in: ["confirmed", "pending"] },
+        checkIn: { lt: end },
+        checkOut: { gt: start },
+      },
+    });
+
+    if (conflict) {
+      return res.status(409).json({ error: "Cannot block dates that overlap with an existing booking" });
+    }
+
+    const blockedDate = await prisma.blocked_date.create({
+      data: { listingId, startDate: start, endDate: end, reason },
+    });
+
+    res.status(201).json({ message: "Dates blocked successfully", blockedDate });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Error blocking dates" });
+  }
+}
+
+/**
+ * GET /api/v1/listings/:id/blocked-dates
+ * FR-018: Get all blocked dates for a listing.
+ */
+export async function getBlockedDates(req: Request, res: Response) {
+  try {
+    const listingId = req.params["id"] as string;
+    const blockedDates = await prisma.blocked_date.findMany({
+      where: { listingId },
+      orderBy: { startDate: "asc" },
+    });
+    res.json(blockedDates);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Error fetching blocked dates" });
+  }
+}
+
+/**
+ * DELETE /api/v1/listings/:id/blocked-dates/:blockedDateId
+ * FR-018: Remove a blocked date range.
+ * - Requires authentication; only the host or admin can remove blocked dates.
+ */
+export async function deleteBlockedDate(req: AuthRequest, res: Response) {
+  try {
+    const { id, blockedDateId } = req.params as { id: string; blockedDateId: string };
+
+    const listing = await prisma.listing.findUnique({ where: { id } });
+    if (!listing) return res.status(404).json({ error: "Listing not found" });
+
+    if (listing.hostId !== req.userId && req.role !== "admin") {
+      return res.status(403).json({ error: "Only the host can unblock dates" });
+    }
+
+    const blockedDate = await prisma.blocked_date.findUnique({ where: { id: blockedDateId } });
+    if (!blockedDate || blockedDate.listingId !== id) {
+      return res.status(404).json({ error: "Blocked date not found" });
+    }
+
+    await prisma.blocked_date.delete({ where: { id: blockedDateId } });
+    res.json({ message: "Blocked dates removed successfully" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Error removing blocked dates" });
   }
 }

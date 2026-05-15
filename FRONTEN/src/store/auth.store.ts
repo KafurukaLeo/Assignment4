@@ -11,21 +11,22 @@ export type User = {
   hostStatus?: "pending" | "approved" | "restricted";
   avatar?: string;
   bio?: string;
+  createdAt?: string;
 };
 
 type AuthState = {
   user: User | null;
   loading: boolean;
   fetchUser: () => Promise<void>;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<{ token: string; user: User }>;
   logout: () => Promise<void>;
   register: (
     name: string,
     username: string,
     email: string,
     password: string,
-    role?: "guest" | "host",
-  ) => Promise<void>;
+    role?: "guest" | "host" | "admin",
+  ) => Promise<{ token: string; user: User }>;
 };
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -42,19 +43,26 @@ export const useAuthStore = create<AuthState>((set) => ({
       set({ user: null, loading: false });
     }
   },
-  login: async (email, password) => {
+  register: async (name, username, email, password, role = "guest") => {
     const { fetchUser } = useAuthStore.getState();
-    const res = await api.post("/auth/login", { email, password });
+    const res = await api.post("/auth/register", { name, username, email, password, role });
     if (res.data.token) {
       localStorage.setItem("token", res.data.token);
+      await fetchUser();
     }
-    await fetchUser();
+    return res.data;
   },
   logout: async () => {
     localStorage.removeItem("token");
     set({ user: null });
   },
-  register: async (name, username, email, password, role = "guest") => {
-    await api.post("/auth/register", { name, username, email, password, role });
+  login: async (email, password) => {
+    const { fetchUser } = useAuthStore.getState();
+    const res = await api.post("/auth/login", { email, password });
+    if (res.data.token) {
+      localStorage.setItem("token", res.data.token);
+      await fetchUser();
+    }
+    return res.data;
   },
 }));

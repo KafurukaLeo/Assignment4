@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   ArrowRight,
   BedDouble,
@@ -16,9 +16,9 @@ import {
 import { toast } from "sonner";
 import Hero from "../components/section/Hero";
 import { Categories } from "../data";
-import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import axios from "axios";
 import { useAuthStore } from "../store/auth.store";
 import type { Listing, ListingType } from "../types";
 import { getImageUrl } from "../lib/utils";
@@ -36,11 +36,15 @@ const typeLabels: Record<ListingType, string> = {
 };
 
 export default function Home() {
-  const navigate = useNavigate();
+  const [selectedType, setSelectedType] = useState<string>("all");
   const { data: listings = [], isLoading, error } = useQuery<Listing[]>({
     queryKey: ["listing"],
     queryFn: getListing,
   });
+
+  const filteredListings = listings.filter((l) => 
+    selectedType === "all" ? true : l.type.toLowerCase() === selectedType.toLowerCase()
+  );
 
 
   if (error) {
@@ -54,24 +58,33 @@ export default function Home() {
   const rows = buildRows(listings);
 
   return (
-    <main className="pb-16 pt-8">
-      <Hero />
-      
-      {/* Category Bar */}
-      <div className="mt-12 mb-8">
-        <div className="flex items-center gap-8 overflow-x-auto pb-4 scrollbar-hide no-scrollbar">
+    <main className="pb-16 pt-0">
+      {/* Category Bar at the Top */}
+      <div className="sticky top-[0px] z-20 bg-white/80 dark:bg-[#030712]/80 backdrop-blur-md py-6 border-b border-gray-100 dark:border-white/[0.08] -mx-4 px-4 sm:-mx-[6vw] sm:px-[6vw] lg:-mx-[9vw] lg:px-[9vw]">
+        <div className="flex items-center gap-8 overflow-x-auto pb-2 no-scrollbar">
           {Categories.map((category) => {
             const Icon = category.icon;
+            const isActive = selectedType === category.title.toLowerCase();
             return (
               <button
                 key={category.title}
-                onClick={() => navigate(`/all-listings?type=${category.title.toLowerCase()}`)}
-                className="flex flex-col items-center gap-3 shrink-0 group transition-all duration-300"
+                onClick={() => setSelectedType(category.title.toLowerCase())}
+                className={`flex flex-col items-center gap-3 shrink-0 group transition-all duration-300 ${
+                  isActive ? "scale-105" : ""
+                }`}
               >
-                <div className="w-14 h-14 rounded-2xl bg-white dark:bg-white/[0.04] border border-gray-100 dark:border-white/[0.08] flex items-center justify-center group-hover:border-(--color-primary) group-hover:shadow-lg group-hover:shadow-(--color-primary)/10 group-hover:-translate-y-1 transition-all duration-300">
-                  <Icon className="w-6 h-6 text-gray-400 group-hover:text-(--color-primary) transition-colors" />
+                <div className={`w-14 h-14 rounded-2xl border flex items-center justify-center transition-all duration-300 ${
+                  isActive 
+                    ? "bg-(--color-primary) border-(--color-primary) shadow-lg shadow-(--color-primary)/20" 
+                    : "bg-white dark:bg-white/[0.04] border-gray-100 dark:border-white/[0.08] group-hover:border-(--color-primary) group-hover:shadow-lg group-hover:shadow-(--color-primary)/10 group-hover:-translate-y-1"
+                }`}>
+                  <Icon className={`w-6 h-6 transition-colors ${
+                    isActive ? "text-white" : "text-gray-400 group-hover:text-(--color-primary)"
+                  }`} />
                 </div>
-                <span className="text-[13px] font-semibold text-gray-500 group-hover:text-gray-950 dark:group-hover:text-white transition-colors">
+                <span className={`text-[13px] font-semibold transition-colors ${
+                  isActive ? "text-(--color-primary)" : "text-gray-500 group-hover:text-gray-950 dark:group-hover:text-white"
+                }`}>
                   {category.title}
                 </span>
               </button>
@@ -79,14 +92,26 @@ export default function Home() {
           })}
         </div>
       </div>
+
+      {selectedType === "all" && (
+        <div className="mt-8">
+          <Hero />
+        </div>
+      )}
       {isLoading ? (
         <div className="space-y-12">
           {Array.from({ length: 5 }).map((_, i) => (
             <ListingRowSkeleton key={i} />
           ))}
         </div>
-      ) : listings.length === 0 ? (
+      ) : filteredListings.length === 0 ? (
         <EmptyHome />
+      ) : selectedType !== "all" ? (
+        <div className="grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {filteredListings.map((listing) => (
+            <HomeListingCard key={listing.id} listing={listing} wide />
+          ))}
+        </div>
       ) : (
         <div className="space-y-12">
           {rows.map((row) => (
@@ -138,24 +163,28 @@ function buildRows(listings: Listing[]) {
       });
     });
 
-  const byType = listings.reduce<Record<string, Listing[]>>((acc, listing) => {
-    const label = typeLabels[listing.type] || "Places";
-    acc[label] = [...(acc[label] || []), listing];
+  const byType = listings.reduce<Record<string, { label: string, listings: Listing[] }>>((acc, listing) => {
+    const typeKey = listing.type;
+    const label = typeLabels[typeKey] || "Places";
+    if (!acc[typeKey]) {
+      acc[typeKey] = { label, listings: [] };
+    }
+    acc[typeKey].listings.push(listing);
     return acc;
   }, {});
 
   Object.entries(byType)
-    .filter(([, typeListings]) => typeListings.length > 0)
-    .slice(0, 3)
-    .forEach(([type, typeListings]) => {
+    .filter(([, data]) => data.listings.length > 0)
+    .forEach(([typeKey, data]) => {
+      const { label, listings: typeListings } = data;
       rows.push({
-        title: type === "Apartments" ? "Great deals on apartments" : `Popular ${type.toLowerCase()}`,
+        title: label === "Apartments" ? "Great deals on apartments" : `Popular ${label.toLowerCase()}`,
         subtitle:
-          type === "Apartments"
+          label === "Apartments"
             ? "Plus, get Airbnb credit when you stay at a featured place."
             : undefined,
         listings: typeListings,
-        to: `/all-listings?type=${encodeURIComponent(type.toLowerCase())}`,
+        to: `/all-listings?type=${encodeURIComponent(typeKey)}`,
       });
     });
 
@@ -224,14 +253,68 @@ function ListingRow({
   );
 }
 
-function HomeListingCard({ listing }: { listing: Listing }) {
+function HomeListingCard({ 
+  listing, 
+  wide 
+}: { 
+  listing: Listing; 
+  wide?: boolean;
+}) {
+  const { user } = useAuthStore();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const photo = listing.photos?.[0];
   const nights = 2;
   const totalPrice = Math.round(listing.pricePerNight * nights);
 
+  // Get favorites to determine if this listing is liked
+  const { data: favorites } = useQuery({
+    queryKey: ["favorites"],
+    queryFn: async () => {
+      const res = await api.get("/users/favorites");
+      return res.data.favorites as any[];
+    },
+    enabled: !!user,
+  });
+
+  const isLiked = favorites?.some((f) => f.listingId === listing.id) ?? false;
+
+  const toggleFavoriteMutation = useMutation({
+    mutationFn: async (listingId: string) => {
+      if (isLiked) {
+        await api.delete(`/users/favorites/${listingId}`);
+        return { action: "removed", message: "Removed from favorites" };
+      } else {
+        await api.post(`/users/favorites/${listingId}`);
+        return { action: "added", message: "Added to favorites" };
+      }
+    },
+    onSuccess: (data) => {
+      toast.success(data.message);
+      queryClient.invalidateQueries({ queryKey: ["favorites"] });
+    },
+    onError: (error: unknown) => {
+      const message = axios.isAxiosError<{ message?: string }>(error)
+        ? error.response?.data?.message
+        : undefined;
+      toast.error(message || "Failed to update favorites");
+    },
+  });
+
+  const handleToggleFavorite = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!user) {
+      toast.error("Please log in to save favorites");
+      navigate("/login");
+      return;
+    }
+    toggleFavoriteMutation.mutate(listing.id);
+  };
+
   return (
-    <Link to={`/listings/${listing.id}`} className="group block w-[160px] shrink-0 sm:w-[180px]">
-      <div className="relative aspect-square overflow-hidden rounded-2xl bg-gray-100 dark:bg-white/[0.05]">
+    <Link to={`/listings/${listing.id}`} className={`group block shrink-0 ${wide ? "w-full" : "w-[160px] sm:w-[180px]"}`}>
+      <div className={`relative overflow-hidden rounded-2xl bg-gray-100 dark:bg-white/[0.05] ${wide ? "aspect-[4/3]" : "aspect-square"}`}>
         {photo ? (
           <img
             src={getImageUrl(photo)}
@@ -250,10 +333,11 @@ function HomeListingCard({ listing }: { listing: Listing }) {
         </span>
         <button
           type="button"
-          className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full text-white drop-shadow"
-          aria-label="Save listing"
+          onClick={handleToggleFavorite}
+          className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/20 backdrop-blur-sm text-white drop-shadow hover:bg-black/40 transition-colors"
+          aria-label={isLiked ? "Remove from favorites" : "Save to favorites"}
         >
-          <Heart className="h-5 w-5 fill-black/25 stroke-white stroke-[2.5]" />
+          <Heart className={`h-5 w-5 transition-all ${isLiked ? "fill-red-500 stroke-red-500 scale-110" : "fill-black/25 stroke-white stroke-[2.5]"}`} />
         </button>
       </div>
       <div className="mt-2 min-w-0">

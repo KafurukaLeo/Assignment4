@@ -10,6 +10,8 @@ import {
   Lightbulb,
   X,
   Search,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 import { useSearchParams } from "react-router-dom";
@@ -66,6 +68,8 @@ export default function Listing() {
   const [aiFeedback, setAiFeedback] = useState<string | null>(null);
   const [aiSuggestion, setAiSuggestion] = useState<string | null>(null);
   const [aiResults, setAiResults] = useState<Listing[] | null>(null);
+  const [page, setPage] = useState(1);
+  const limit = 12;
 
   const {
     data: listingsResponse,
@@ -80,6 +84,7 @@ export default function Listing() {
       guestsParam,
       priceRange,
       selectedCategories,
+      page,
     ],
     queryFn: async () => {
       const params = new URLSearchParams();
@@ -94,7 +99,8 @@ export default function Listing() {
             .join(","),
         );
       }
-      params.set("limit", "100");
+      params.set("page", String(page));
+      params.set("limit", String(limit));
 
       const res = await api.get(`/listings?${params.toString()}`);
       return res.data;
@@ -172,6 +178,7 @@ export default function Listing() {
       newParams.delete("type");
     }
     setSearchParams(newParams);
+    setPage(1);
   };
 
   const listings = Array.isArray(listingsResponse?.data) 
@@ -199,6 +206,7 @@ export default function Listing() {
     setAiFeedback(null);
     setAiSuggestion(null);
     setAiResults(null);
+    setPage(1);
   };
 
   const renderSidebarContent = () => (
@@ -585,6 +593,48 @@ export default function Listing() {
                   type={viewType}
                 />
               ))}
+            </div>
+          )}
+
+          {/* Pagination */}
+          {!aiResults && listingsResponse?.meta && listingsResponse.meta.totalPages > 1 && (
+            <div className="mt-12 flex flex-col items-center gap-4">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setPage((p) => Math.max(1, p - 1));
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                  disabled={page === 1}
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 transition-all hover:bg-gray-50 disabled:opacity-40 dark:border-white/[0.08] dark:bg-white/[0.02] dark:text-gray-400"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+
+                <div className="flex items-center gap-1.5 px-4 py-2 bg-gray-50 dark:bg-white/[0.04] rounded-xl border border-gray-100 dark:border-white/[0.06]">
+                  <span className="text-[13px] font-semibold text-gray-900 dark:text-white">
+                    {page}
+                  </span>
+                  <span className="text-[12px] text-gray-400">/</span>
+                  <span className="text-[13px] font-medium text-gray-500">
+                    {listingsResponse.meta.totalPages}
+                  </span>
+                </div>
+
+                <button
+                  onClick={() => {
+                    setPage((p) => Math.min(listingsResponse.meta.totalPages, p + 1));
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                  disabled={page === listingsResponse.meta.totalPages}
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 transition-all hover:bg-gray-50 disabled:opacity-40 dark:border-white/[0.08] dark:bg-white/[0.02] dark:text-gray-400"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+              <p className="text-[11px] text-gray-400 font-medium uppercase tracking-widest">
+                Showing {listings.length} of {listingsResponse.meta.total} properties
+              </p>
             </div>
           )}
         </div>

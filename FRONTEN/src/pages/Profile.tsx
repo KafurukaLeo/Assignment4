@@ -6,6 +6,7 @@ import { api, apiFormData } from "../lib/api";
 import { toast } from "sonner";
 import {
   Camera,
+  CalendarDays,
   KeyRound,
   Mail,
   Phone,
@@ -185,10 +186,16 @@ export default function Profile() {
               <p className="text-[13px] text-gray-500 dark:text-gray-400">
                 @{user.username}
               </p>
-              <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-(--color-primary)/10 px-3 py-1 text-[12px] font-semibold text-(--color-primary)">
+              <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-(--color-primary)/10 px-3 py-1 text-[12px] font-semibold text-(--color-primary) capitalize">
                 <ShieldCheck className="h-3.5 w-3.5" />
                 {user.role}
               </span>
+              {user.createdAt && (
+                <span className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-gray-100 dark:bg-white/[0.07] px-3 py-1 text-[11px] font-medium text-gray-500 dark:text-gray-400">
+                  <CalendarDays className="h-3 w-3" />
+                  Member since {new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(new Date(user.createdAt))}
+                </span>
+              )}
             </div>
 
             <div className="mt-5 space-y-2">
@@ -235,7 +242,7 @@ export default function Profile() {
             </p>
             <InfoLine icon={Mail} label={user.email} />
             <InfoLine icon={Phone} label={user.phone || "No phone added"} />
-            <InfoLine icon={User} label={user.role} />
+            <InfoLine icon={User} label={user.role.charAt(0).toUpperCase() + user.role.slice(1)} />
           </div>
         </aside>
 

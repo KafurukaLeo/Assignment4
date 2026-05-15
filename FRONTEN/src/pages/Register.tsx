@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { Link, useNavigate } from "react-router-dom";
-import { Mail, User, Lock, AtSign, Home, Briefcase, ShieldCheck } from "lucide-react";
+import { Mail, User, Lock, AtSign, Home, Briefcase } from "lucide-react";
 import axios from "axios";
 import { useAuthStore } from "../store/auth.store";
+import Logo from "../components/layout/Logo";
 
 export default function Register() {
   const [name, setName] = useState("");
@@ -17,15 +18,22 @@ export default function Register() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log("Registration attempt started:", { name, username, email, role });
     setIsLoading(true);
 
     try {
       await register(name, username, email, password, role);
-      toast.success("Registration successful");
-      navigate("/login");
+      console.log("Registration successful! Navigating in 2 seconds...");
+      toast.success("Account has been created");
+      setTimeout(() => {
+        if (role === "host") navigate("/dashboard");
+        else if (role === "admin") navigate("/admin");
+        else navigate("/");
+      }, 2000);
     } catch (error: unknown) {
-      const message = axios.isAxiosError<{ message?: string }>(error)
-        ? error.response?.data?.message
+      console.error("Registration error captured in component:", error);
+      const message = axios.isAxiosError<{ message?: string; error?: string }>(error)
+        ? error.response?.data?.message || error.response?.data?.error
         : error instanceof Error
           ? error.message
           : "Registration failed";
@@ -38,12 +46,8 @@ export default function Register() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-white px-4 py-10 dark:bg-[#0f1117]">
       <div className="w-full max-w-[420px]">
-        <Link
-          to="/"
-          className="inline-flex text-2xl font-bold text-gray-950 dark:text-white"
-        >
-          Air<span className="text-(--color-primary)">b</span>nb
-        </Link>
+        <Logo />
+
 
         <div className="mt-10">
           <p className="text-[12px] font-semibold uppercase tracking-widest text-gray-400">
@@ -104,14 +108,17 @@ export default function Register() {
                 <button
                   key={value}
                   type="button"
-                  onClick={() => setRole(value as any)}
-                  className={`flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-[13px] font-semibold transition-colors ${
+                  onClick={() => {
+                    console.log("Role changed to:", value);
+                    setRole(value as any);
+                  }}
+                  className={`flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-[13px] font-semibold transition-all duration-200 ${
                     role === value
-                      ? "bg-(--color-primary) text-white"
-                      : "text-gray-500 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-white/[0.06]"
+                      ? "bg-(--color-primary) text-white shadow-md scale-[1.02]"
+                      : "bg-transparent text-gray-500 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-white/[0.06]"
                   }`}
                 >
-                  <Icon className="h-4 w-4" />
+                  <Icon className={`h-4 w-4 ${role === value ? "text-white" : "text-gray-400"}`} />
                   {label}
                 </button>
               ))}

@@ -1,12 +1,15 @@
 import { ArrowLeft, Home } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import Logo from "../components/layout/Logo";
 
 export default function NotFound() {
   const navigate = useNavigate();
 
   return (
-    <div className="flex min-h-[75vh] items-center justify-center px-4 text-center">
+    <div className="flex min-h-[75vh] flex-col items-center justify-center px-4 text-center">
+      <Logo className="mb-10" />
       <div className="max-w-md">
+
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-(--color-primary)/10 text-(--color-primary)">
           <Home className="h-7 w-7" />
         </div>

@@ -19,6 +19,7 @@ type HostAccount = {
   createdAt: string;
   _count: {
     listings: number;
+    bookings: number;
   };
 };
 
@@ -133,10 +134,11 @@ export default function HostApprovals() {
       </div>
 
       <div className="overflow-hidden rounded-lg border border-[#EBEBEB] bg-white dark:border-[#2A2A2A] dark:bg-[#1A1A1A]">
-        <div className="hidden grid-cols-[minmax(220px,1.4fr)_120px_120px_220px] gap-4 border-b border-[#EBEBEB] px-5 py-3 text-[12px] font-semibold uppercase tracking-wide text-[#AAAAAA] dark:border-[#2A2A2A] md:grid">
+        <div className="hidden grid-cols-[minmax(220px,1.4fr)_110px_100px_100px_220px] gap-4 border-b border-[#EBEBEB] px-5 py-3 text-[12px] font-semibold uppercase tracking-wide text-[#AAAAAA] dark:border-[#2A2A2A] md:grid">
           <span>Host</span>
           <span>Status</span>
           <span>Listings</span>
+          <span>Bookings</span>
           <span>Actions</span>
         </div>
 
@@ -183,7 +185,7 @@ function HostRow({
   const StatusIcon = config.icon;
 
   return (
-    <div className="grid gap-4 px-5 py-4 md:grid-cols-[minmax(220px,1.4fr)_120px_120px_220px] md:items-center">
+    <div className="grid gap-4 px-5 py-4 md:grid-cols-[minmax(220px,1.4fr)_110px_100px_100px_220px] md:items-center">
       <div className="flex min-w-0 items-center gap-3">
         {host.avatar ? (
           <img
@@ -215,6 +217,10 @@ function HostRow({
 
       <p className="text-[13px] text-[#717171] dark:text-[#AAAAAA]">
         {host._count.listings} listings
+      </p>
+
+      <p className="text-[13px] text-[#717171] dark:text-[#AAAAAA]">
+        {host._count.bookings} bookings
       </p>
 
       <div className="flex flex-wrap items-center gap-2">

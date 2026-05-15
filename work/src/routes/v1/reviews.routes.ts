@@ -9,7 +9,7 @@ import {
   updateReview,
 } from "../../controllers/reviews.controller";
 // authenticate middleware — verifies JWT token for protected routes
-import { authenticate } from "../../middlewares/auth.middleware";
+import { authenticate, requireGuest } from "../../middlewares/auth.middleware";
 
 const router = Router();
 
@@ -103,7 +103,7 @@ router.get("/listings/:id/reviews", getReviews);
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.post("/listings/:id/reviews", authenticate, createReview);
+router.post("/listings/:id/reviews", authenticate, requireGuest, createReview);
 
 /**
  * @swagger

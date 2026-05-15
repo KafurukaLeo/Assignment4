@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import prisma from "../config/prisma";
 import { deleteCache } from "../config/catche";
 import { formatListing } from "../utils/listing";
+import { recalculateListingRating } from "./listings.controller";
 
 /**
  * POST /api/v1/reviews
@@ -31,6 +32,9 @@ export const createReview = async (req: Request, res: Response) => {
     });
 
     res.status(201).json({ success: true, data: { ...review, listing: formatListing(review.listing) } });
+
+    // FR-059: recalculate listing average rating after new review is added
+    await recalculateListingRating(listingId).catch(console.error);
 
     // Clear the cached AI review summary for this listing
     // so the next summary request reflects the new review
@@ -95,6 +99,13 @@ export const updateReview = async (req: Request, res: Response) => {
     const review = await prisma.review.findUnique({ where: { id } });
     if (!review) return res.status(404).json({ error: "Review not found" });
 
+    // Ensure the user is updating their own review
+    const userId = (req as any).userId;
+    const role = (req as any).role;
+    if (review.userId !== userId && role !== "admin") {
+      return res.status(403).json({ error: "You can only update your own reviews" });
+    }
+
     // Keep existing values for fields not provided in the request
     const updated = await prisma.review.update({
       where: { id },
@@ -105,6 +116,9 @@ export const updateReview = async (req: Request, res: Response) => {
       include: { user: true, listing: true },
     });
     res.json({ success: true, data: { ...updated, listing: formatListing(updated.listing) } });
+
+    // FR-059: recalculate listing average rating after review is updated
+    await recalculateListingRating(review.listingId).catch(console.error);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Failed to update review" });
@@ -123,8 +137,18 @@ export const deleteReview = async (req: Request, res: Response) => {
     const review = await prisma.review.findUnique({ where: { id } });
     if (!review) return res.status(404).json({ error: "Review not found" });
 
+    // Ensure the user is deleting their own review
+    const userId = (req as any).userId;
+    const role = (req as any).role;
+    if (review.userId !== userId && role !== "admin") {
+      return res.status(403).json({ error: "You can only delete your own reviews" });
+    }
+
     await prisma.review.delete({ where: { id } });
     res.json({ success: true, message: "Review deleted successfully" });
+
+    // FR-059: recalculate listing average rating after review is removed
+    await recalculateListingRating(review.listingId).catch(console.error);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Failed to delete review" });

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../../lib/api";
 import {
@@ -10,9 +11,7 @@ import {
   Clock,
   MapPin,
   ChevronRight,
-  ShieldCheck,
   Wallet,
-  CheckCircle2,
 } from "lucide-react";
 import { useAuthStore } from "../../store/auth.store";
 import { Link } from "react-router-dom";
@@ -75,6 +74,7 @@ const statusConfig: Record<string, { label: string; class: string }> = {
 
 export default function Dashboard() {
   const { user } = useAuthStore();
+  const [dashboardMode, setDashboardMode] = useState<"hosting" | "traveling">("hosting");
   const { data: stats, isLoading } = useQuery({
     queryKey: ["dashboard-stats"],
     queryFn: getDashboardStats,
@@ -99,25 +99,65 @@ export default function Dashboard() {
             Welcome back, {user?.name}
           </h1>
         </div>
-        <div className="hidden sm:block text-right">
-          <p className="text-[12px] text-[#AAAAAA]">Last updated</p>
-          <p className="text-[13px] font-medium text-[#111] dark:text-white">
-            {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-          </p>
+        <div className="flex items-center gap-3">
+          {role === "host" && (
+            <div className="flex p-1 bg-gray-100 dark:bg-white/[0.05] rounded-xl mr-4">
+              <button
+                onClick={() => setDashboardMode("hosting")}
+                className={`px-4 py-1.5 text-[12px] font-semibold rounded-lg transition-all ${
+                  dashboardMode === "hosting"
+                    ? "bg-white dark:bg-[#1A1A1A] text-(--color-primary) shadow-sm"
+                    : "text-[#AAAAAA] hover:text-[#717171]"
+                }`}
+              >
+                Hosting
+              </button>
+              <button
+                onClick={() => setDashboardMode("traveling")}
+                className={`px-4 py-1.5 text-[12px] font-semibold rounded-lg transition-all ${
+                  dashboardMode === "traveling"
+                    ? "bg-white dark:bg-[#1A1A1A] text-(--color-primary) shadow-sm"
+                    : "text-[#AAAAAA] hover:text-[#717171]"
+                }`}
+              >
+                Traveling
+              </button>
+            </div>
+          )}
+          <div className="hidden sm:block text-right">
+            <p className="text-[12px] text-[#AAAAAA]">Last updated</p>
+            <p className="text-[13px] font-medium text-[#111] dark:text-white">
+              {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+            </p>
+          </div>
         </div>
       </div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {role === "admin" && <AdminStats stats={stats} />}
-        {role === "host" && <HostStats stats={stats} />}
+        {role === "host" && (
+          dashboardMode === "hosting" ? (
+            <HostStats stats={stats} />
+          ) : (
+            <GuestStats stats={{
+              ...stats,
+              totalBookings: (stats as any).guestStats?.totalBookings,
+              totalSpent: (stats as any).guestStats?.totalSpent,
+              recentBookings: (stats as any).recentGuestBookings
+            }} />
+          )
+        )}
         {role === "guest" && <GuestStats stats={stats} />}
       </div>
 
       {/* Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <RecentBookings role={role} bookings={stats?.recentBookings || []} />
-        {role !== "guest" ? (
+        <RecentBookings 
+          role={dashboardMode === "traveling" ? "guest" : role} 
+          bookings={(dashboardMode === "traveling" ? (stats as any).recentGuestBookings : stats?.recentBookings) || []} 
+        />
+        {dashboardMode === "hosting" && role !== "guest" ? (
           <TopListings listings={stats?.topListings || []} />
         ) : (
           <GuestQuickActions />

@@ -22,12 +22,11 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { api, apiFormData } from "../../lib/api";
-import { toast } from "sonner";
-import { useAuthStore } from "../../store/auth.store";
 import { getImageUrl } from "../../lib/utils";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Listing } from "../../types";
 import axios from "axios";
+import { toast } from "sonner";
 
 type ListingType = "apartment" | "house" | "villa" | "cabin";
 
@@ -182,23 +181,31 @@ export default function ListingForm({
           (p) => typeof p === "string",
         );
         data.append("existingPhotos", JSON.stringify(existingPhotos));
-        const response = await api.put(`/listings/${listing.id}`, data, {
+        const response = await apiFormData.put(`/listings/${listing.id}`, data, {
           headers: { "Content-Type": "multipart/form-data" },
         });
         return response.data;
       } else {
         data.append("rating", "0");
-        const response = await api.post("/listings", data, {
+        const response = await apiFormData.post("/listings", data, {
           headers: { "Content-Type": "multipart/form-data" },
         });
         return response.data;
       }
     },
     onSuccess: () => {
+      toast.success(`Listing ${isEditing ? "updated" : "published"} successfully!`);
       queryClient.invalidateQueries({ queryKey: ["listings"] });
       queryClient.invalidateQueries({ queryKey: ["listings", "me"] });
       onSuccess?.();
       onClose();
+    },
+    onError: (error: unknown) => {
+      const message = getMutationMessage(
+        error,
+        `Failed to ${isEditing ? "update" : "create"} listing`
+      );
+      toast.error(message);
     },
   });
 

@@ -1,14 +1,17 @@
 import "dotenv/config";
-import { defineConfig } from "prisma/config";
 
-export default defineConfig({
+/**
+ * Prisma config — schema and migration paths for the Prisma CLI.
+ * Note: 'prisma/config' module is only available in Prisma v6+.
+ * Using plain export for compatibility with Prisma v5.
+ */
+export default {
   schema: "prisma/schema.prisma",
   migrations: {
     path: "prisma/migrations",
     seed: "tsx prisma/seed.ts",
   },
   datasource: {
-    // Direct (non-pooler) URL so Prisma CLI can run DDL / migrations against Neon
     url: process.env["DATABASE_URL"] as string,
   },
-});
+};

@@ -9,6 +9,7 @@ import uploadRoutes from "./upload.routes";
 import { deprecatev1 } from "../../middlewares/deprecation.middleware";
 import aiRoutes from "./ai.routes";
 import messageRoutes from "./messages.routes";
+import notificationRoutes from "./notifications.routes";
 
 // Create the v1 router — all routes here are prefixed with /api/v1 (set in index.ts)
 export const v1Router = Router();
@@ -27,5 +28,6 @@ v1Router.use("/upload", uploadRoutes);     // POST /api/v1/upload/avatar/:id
 v1Router.use("/stats", statsRoutes);       // GET /api/v1/stats
 v1Router.use("/ai", aiRoutes);             // POST /api/v1/ai/search, /recommend, etc.
 v1Router.use("/messages", messageRoutes);   // GET/POST /api/v1/messages
+v1Router.use("/notifications", notificationRoutes); // GET/PATCH /api/v1/notifications
 
 export default v1Router;

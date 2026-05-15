@@ -1,9 +1,9 @@
 import { Heart, Star, MapPin, BadgeCheck, ArrowRight } from "lucide-react";
 import type { Listing } from "../../types";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
 import { toast } from "sonner";
 import axios from "axios";
@@ -17,28 +17,33 @@ interface ListingCardProps {
 
 export default function ListingCard({ listing, type }: ListingCardProps) {
   const { user } = useAuthStore();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [isLiked, setIsLiked] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
+
+  // Get favorites to determine if this listing is liked
+  const { data: favorites } = useQuery({
+    queryKey: ["favorites"],
+    queryFn: async () => {
+      const res = await api.get("/users/favorites");
+      return res.data.favorites as any[];
+    },
+    enabled: !!user,
+  });
+
+  const isLiked = favorites?.some((f) => f.listingId === listing.id) ?? false;
 
   const toggleFavoriteMutation = useMutation({
     mutationFn: async (listingId: string) => {
-      try {
+      if (isLiked) {
+        await api.delete(`/users/favorites/${listingId}`);
+        return { action: "removed", message: "Removed from favorites" };
+      } else {
         await api.post(`/users/favorites/${listingId}`);
         return { action: "added", message: "Added to favorites" };
-      } catch (error: unknown) {
-        if (
-          axios.isAxiosError(error) &&
-          (error.response?.status === 400 || error.response?.status === 409)
-        ) {
-          await api.delete(`/users/favorites/${listingId}`);
-          return { action: "removed", message: "Removed from favorites" };
-        }
-        throw error;
       }
     },
     onSuccess: (data) => {
-      setIsLiked(data.action === "added");
       toast.success(data.message);
       queryClient.invalidateQueries({ queryKey: ["favorites"] });
     },
@@ -56,6 +61,7 @@ export default function ListingCard({ listing, type }: ListingCardProps) {
     e.stopPropagation();
     if (!user) {
       toast.error("Please log in to save favorites");
+      navigate("/login");
       return;
     }
     toggleFavoriteMutation.mutate(listing.id);

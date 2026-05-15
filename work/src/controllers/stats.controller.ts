@@ -83,7 +83,7 @@ export const getDashboardStats = async (req: any, res: Response) => {
     }
 
     if (role === "host") {
-      const [listingsCount, bookingsCount, revenue, avgRating] = await Promise.all([
+      const [listingsCount, bookingsCount, revenue, avgRating, guestBookingsCount, totalSpent] = await Promise.all([
         prisma.listing.count({ where: { hostId: userId } }),
         prisma.booking.count({ where: { listing: { hostId: userId } } }),
         prisma.booking.aggregate({
@@ -94,6 +94,11 @@ export const getDashboardStats = async (req: any, res: Response) => {
           where: { listing: { hostId: userId } },
           _avg: { rating: true },
         }),
+        prisma.booking.count({ where: { guestId: userId } }),
+        prisma.booking.aggregate({
+          where: { guestId: userId, status: "confirmed" },
+          _sum: { totalPrice: true },
+        }),
       ]);
 
       const recentBookings = await prisma.booking.findMany({
@@ -101,6 +106,13 @@ export const getDashboardStats = async (req: any, res: Response) => {
         take: 5,
         orderBy: { createdAt: "desc" },
         include: { listing: { select: { title: true } }, guest: { select: { name: true } } },
+      });
+
+      const recentGuestBookings = await prisma.booking.findMany({
+        where: { guestId: userId },
+        take: 5,
+        orderBy: { createdAt: "desc" },
+        include: { listing: { select: { title: true, location: true, photos: true } } },
       });
 
       const topListings = await prisma.listing.findMany({
@@ -116,7 +128,12 @@ export const getDashboardStats = async (req: any, res: Response) => {
         totalRevenue: revenue._sum.totalPrice || 0,
         averageRating: avgRating._avg.rating || 0,
         recentBookings,
+        recentGuestBookings, // New: host's own trips
         topListings,
+        guestStats: {
+          totalBookings: guestBookingsCount,
+          totalSpent: totalSpent._sum.totalPrice || 0,
+        }
       });
     }
 

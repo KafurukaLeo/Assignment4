@@ -1,4 +1,4 @@
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import {
   CalendarDays,
   Car,
@@ -18,7 +18,7 @@ import {
   Wind,
 } from "lucide-react";
 import { useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import type { Listing } from "../types";
 import Spinner from "../components/Spinner";
@@ -42,9 +42,54 @@ const amenityIcons: Record<
 export default function ListingDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { user } = useAuthStore();
-  const [isSaved, setIsSaved] = useState(false);
   const [sliderIndex, setSliderIndex] = useState(0);
+  const [checkIn, setCheckIn] = useState("");
+  const [checkOut, setCheckOut] = useState("");
+
+  // Get favorites to determine if this listing is liked
+  const { data: favorites } = useQuery({
+    queryKey: ["favorites"],
+    queryFn: async () => {
+      const res = await api.get("/users/favorites");
+      return res.data.favorites as any[];
+    },
+    enabled: !!user,
+  });
+
+  const isSaved = favorites?.some((f) => f.listingId === id) ?? false;
+
+  const toggleFavoriteMutation = useMutation({
+    mutationFn: async () => {
+      if (isSaved) {
+        await api.delete(`/users/favorites/${id}`);
+        return { action: "removed", message: "Removed from favorites" };
+      } else {
+        await api.post(`/users/favorites/${id}`);
+        return { action: "added", message: "Added to favorites" };
+      }
+    },
+    onSuccess: (data) => {
+      toast.success(data.message);
+      queryClient.invalidateQueries({ queryKey: ["favorites"] });
+    },
+    onError: (error: unknown) => {
+      const message = axios.isAxiosError<{ message?: string }>(error)
+        ? error.response?.data?.message
+        : undefined;
+      toast.error(message || "Failed to update favorites");
+    },
+  });
+
+  const handleToggleFavorite = () => {
+    if (!user) {
+      toast.error("Please log in to save favorites");
+      navigate("/login");
+      return;
+    }
+    toggleFavoriteMutation.mutate();
+  };
 
   const {
     data: listing,
@@ -57,6 +102,27 @@ export default function ListingDetail() {
       return (res.data.listing ?? res.data) as Listing;
     },
     enabled: !!id,
+  });
+
+  const createBookingMutation = useMutation({
+    mutationFn: async (bookingData: {
+      listingId: string | undefined;
+      checkIn: string;
+      checkOut: string;
+    }) => {
+      const response = await api.post("/bookings", bookingData);
+      return response.data;
+    },
+    onSuccess: () => {
+      toast.success("Booking request created");
+      navigate("/bookings");
+    },
+    onError: (error: unknown) => {
+      const message = axios.isAxiosError<{ error?: string }>(error)
+        ? error.response?.data?.error
+        : undefined;
+      toast.error(message || "Failed to create booking");
+    },
   });
 
   const conversationMutation = useMutation({
@@ -124,7 +190,34 @@ export default function ListingDetail() {
       return;
     }
 
-    navigate(`/messages/${listing.hostId}`);
+    navigate(`/messages?contact=${listing.hostId}`);
+  };
+
+  const nights = getNights(checkIn, checkOut);
+  const subtotal = Math.round(nights * listing.pricePerNight);
+  const serviceFee = Math.round(subtotal * 0.1); // 10% service fee
+  const totalPrice = subtotal + serviceFee;
+  const today = new Date().toISOString().split("T")[0];
+
+  const handleReserve = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!user) {
+      navigate(`/login?redirect=/listings/${id}`);
+      return;
+    }
+
+    if (!checkIn || !checkOut) {
+      toast.error("Please select check-in and check-out dates");
+      return;
+    }
+
+    if (new Date(checkIn) >= new Date(checkOut)) {
+      toast.error("Check-out must be after check-in");
+      return;
+    }
+
+    createBookingMutation.mutate({ listingId: id, checkIn, checkOut });
   };
 
   return (
@@ -143,11 +236,11 @@ export default function ListingDetail() {
               <Share2 className="h-4 w-4" />
             </button>
             <button
-              onClick={() => setIsSaved((value) => !value)}
+              onClick={handleToggleFavorite}
               className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 text-gray-700 transition-colors hover:bg-gray-50 dark:border-white/[0.08] dark:text-gray-300 dark:hover:bg-white/[0.04]"
             >
               <Heart
-                className={`h-4 w-4 ${isSaved ? "fill-(--color-primary) text-(--color-primary)" : ""}`}
+                className={`h-4 w-4 ${isSaved ? "fill-[var(--color-primary)] text-[var(--color-primary)]" : ""}`}
               />
             </button>
           </div>
@@ -310,10 +403,45 @@ export default function ListingDetail() {
               <h2 className="text-xl font-semibold text-gray-950 dark:text-white">
                 Location
               </h2>
-              <p className="mt-2 flex items-center gap-1.5 text-[14px] text-gray-500 dark:text-gray-400">
-                <MapPin className="h-4 w-4" />
-                {listing.location}
-              </p>
+              
+              <div className="mt-4 mb-2 grid gap-4 sm:grid-cols-3">
+                {(() => {
+                  const parts = listing.location.split(',').map(p => p.trim());
+                  let street = '', city = '', country = '';
+                  
+                  if (parts.length === 1) {
+                    city = parts[0];
+                    country = 'Unknown';
+                  } else if (parts.length === 2) {
+                    city = parts[0];
+                    country = parts[1];
+                  } else {
+                    street = parts.slice(0, parts.length - 2).join(', ');
+                    city = parts[parts.length - 2];
+                    country = parts[parts.length - 1];
+                  }
+
+                  return (
+                    <>
+                      {street && (
+                        <div className="flex flex-col gap-1 rounded-xl bg-gray-50 p-3 dark:bg-white/[0.04]">
+                          <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">Street / Area</span>
+                          <span className="text-[14px] font-medium text-gray-950 dark:text-white">{street}</span>
+                        </div>
+                      )}
+                      <div className="flex flex-col gap-1 rounded-xl bg-gray-50 p-3 dark:bg-white/[0.04]">
+                        <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">City</span>
+                        <span className="text-[14px] font-medium text-gray-950 dark:text-white">{city}</span>
+                      </div>
+                      <div className="flex flex-col gap-1 rounded-xl bg-gray-50 p-3 dark:bg-white/[0.04]">
+                        <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">Country / Region</span>
+                        <span className="text-[14px] font-medium text-gray-950 dark:text-white">{country}</span>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+
               <div className="mt-5 overflow-hidden rounded-xl border border-gray-200 bg-gray-100 dark:border-white/[0.08] dark:bg-white/[0.05]">
                 <iframe
                   title="Property location"
@@ -330,34 +458,87 @@ export default function ListingDetail() {
           </main>
 
           <aside className="lg:sticky lg:top-24 lg:self-start">
-            <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-white/[0.08] dark:bg-[#111827]">
+            <div className="rounded-[1.75rem] border border-gray-200 bg-white p-5 shadow-lg shadow-black/[0.05] dark:border-white/[0.08] dark:bg-[#111827] dark:shadow-black/25">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-2xl font-semibold text-gray-950 dark:text-white">
+                  <p className="text-[13px] text-gray-500 dark:text-gray-400">
+                    Price
+                  </p>
+                  <p className="mt-1 text-2xl font-semibold text-gray-950 dark:text-white">
                     ${listing.pricePerNight}
                     <span className="text-[14px] font-normal text-gray-500">
                       {" "}
                       night
                     </span>
                   </p>
-                  <p className="mt-1 text-[13px] text-gray-500 dark:text-gray-400">
-                    Taxes and fees calculated during booking.
+                </div>
+                <span className="rounded-full bg-emerald-500/10 px-3 py-1.5 text-[12px] font-semibold text-emerald-600 dark:text-emerald-400">
+                  Instant Book
+                </span>
+              </div>
+
+              <div className="mt-5 overflow-hidden rounded-2xl border border-gray-200 dark:border-white/[0.08]">
+                <div className="grid grid-cols-2">
+                  <div className="border-r border-b border-gray-200 p-3 dark:border-white/[0.08]">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                      Check-in
+                    </p>
+                    <input
+                      type="date"
+                      value={checkIn}
+                      min={today}
+                      onChange={(e) => setCheckIn(e.target.value)}
+                      className="mt-1 w-full bg-transparent text-[13px] font-medium text-gray-950 outline-none dark:text-white"
+                    />
+                  </div>
+                  <div className="border-b border-gray-200 p-3 dark:border-white/[0.08]">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                      Check-out
+                    </p>
+                    <input
+                      type="date"
+                      value={checkOut}
+                      min={checkIn || today}
+                      onChange={(e) => setCheckOut(e.target.value)}
+                      className="mt-1 w-full bg-transparent text-[13px] font-medium text-gray-950 outline-none dark:text-white"
+                    />
+                  </div>
+                </div>
+                <div className="p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                    Guests
+                  </p>
+                  <p className="mt-1 text-[13px] font-medium text-gray-950 dark:text-white">
+                    Up to {listing.guests} guests
                   </p>
                 </div>
-                {listing.rating && (
-                  <span className="inline-flex items-center gap-1 text-[13px] font-semibold text-gray-950 dark:text-white">
-                    <Star className="h-3.5 w-3.5 fill-gray-900 stroke-none dark:fill-white" />
-                    {formatRating(listing.rating)}
-                  </span>
-                )}
+              </div>
+
+              <div className="mt-5 space-y-3 text-[14px]">
+                <div className="flex justify-between gap-4 text-gray-600 dark:text-gray-300">
+                  <span>${listing.pricePerNight} x {nights} nights</span>
+                  <span>${subtotal}</span>
+                </div>
+                <div className="flex justify-between gap-4 text-gray-600 dark:text-gray-300">
+                  <span>Service fee (10%)</span>
+                  <span>${serviceFee}</span>
+                </div>
+                <div className="border-t border-gray-200 pt-3 dark:border-white/[0.08]">
+                  <div className="flex justify-between gap-4 text-[16px] font-bold text-gray-950 dark:text-white">
+                    <span>Total</span>
+                    <span>${totalPrice}</span>
+                  </div>
+                </div>
               </div>
 
               <button
-                onClick={() => navigate(`/bookings/${id}`)}
-                className="mt-5 h-11 w-full rounded-lg bg-(--color-primary) px-5 text-[14px] font-semibold text-white transition-colors hover:bg-(--color-primary-dark)"
+                onClick={handleReserve}
+                disabled={createBookingMutation.isPending || (nights <= 0 && !!checkIn && !!checkOut)}
+                className="mt-5 h-12 w-full rounded-xl bg-(--color-primary) px-5 text-[15px] font-bold text-white shadow-md transition-all hover:bg-(--color-primary-dark) active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Reserve
+                {createBookingMutation.isPending ? "Reserving..." : "Reserve"}
               </button>
+              
               <button
                 onClick={handleMessageHost}
                 disabled={conversationMutation.isPending}
@@ -367,25 +548,10 @@ export default function ListingDetail() {
                   ? "Opening chat..."
                   : "Message host"}
               </button>
+
               <p className="mt-3 text-center text-[12px] text-gray-500 dark:text-gray-400">
-                You will choose dates on the next step.
+                You will not be charged yet.
               </p>
-
-              <div className="mt-5 space-y-3 border-t border-gray-200 pt-5 text-[14px] dark:border-white/[0.08]">
-                <InfoLine label="Max guests" value={`${listing.guests}`} />
-                <InfoLine label="Property type" value={listing.type} />
-                <InfoLine
-                  label="Host"
-                  value={listing.host?.name || "Verified"}
-                />
-              </div>
-
-              <Link
-                to={`/listings/${id}/reviews`}
-                className="mt-5 inline-flex h-10 w-full items-center justify-center rounded-lg border border-gray-200 px-4 text-[13px] font-semibold text-gray-700 transition-colors hover:bg-gray-50 dark:border-white/[0.08] dark:text-gray-300 dark:hover:bg-white/[0.04]"
-              >
-                Read reviews
-              </Link>
             </div>
           </aside>
         </div>
@@ -436,16 +602,6 @@ function Fact({
   );
 }
 
-function InfoLine({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex justify-between gap-4">
-      <span className="text-gray-500 dark:text-gray-400">{label}</span>
-      <span className="font-medium capitalize text-gray-950 dark:text-white">
-        {value}
-      </span>
-    </div>
-  );
-}
 
 function formatRating(rating: number) {
   return rating.toFixed(2).replace(/0$/, "");
@@ -454,4 +610,15 @@ function formatRating(rating: number) {
 function getMapUrl(location: string) {
   const encodedLocation = encodeURIComponent(location);
   return `https://www.google.com/maps?q=${encodedLocation}&output=embed`;
+}
+
+function getNights(checkIn: string, checkOut: string) {
+  if (!checkIn || !checkOut) return 0;
+  return Math.max(
+    0,
+    Math.ceil(
+      (new Date(checkOut).getTime() - new Date(checkIn).getTime()) /
+        (1000 * 60 * 60 * 24),
+    ),
+  );
 }

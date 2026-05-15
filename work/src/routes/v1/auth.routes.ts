@@ -1,9 +1,7 @@
 // Express Router — creates a modular route handler for auth endpoints
 import { Router } from "express";
-// Auth controller functions for registration, login, and password management
-import { login, register, changePassword, resetPassword, forgotPassword, me } from "../../controllers/auth.controller";
-// authenticate middleware — verifies JWT token, required for protected routes like /me
-import { authenticate } from "../../middlewares/auth.middleware";
+import { login, register, changePassword, resetPassword, forgotPassword, me, assignRole, verifyEmail, resendVerification } from "../../controllers/auth.controller";
+import { authenticate, requireAdmin } from "../../middlewares/auth.middleware";
 
 /**
  * @swagger
@@ -453,6 +451,40 @@ router.get("/me", authenticate, me);
 
 /**
  * @swagger
+ * /auth/assign-role:
+ *   post:
+ *     summary: Assign a role to a user (Admin only)
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - userId
+ *               - role
+ *             properties:
+ *               userId:
+ *                 type: string
+ *               role:
+ *                 type: string
+ *                 enum: [guest, host, admin]
+ *     responses:
+ *       '200':
+ *         description: Role updated successfully
+ *       '401':
+ *         description: Unauthorized
+ *       '403':
+ *         description: Forbidden (Admin only)
+ */
+router.post("/assign-role", authenticate, requireAdmin, assignRole);
+
+
+/**
+ * @swagger
  * /auth/change-password:
  *   post:
  *     summary: Change user password
@@ -562,5 +594,47 @@ router.post("/forgot-password", forgotPassword);
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.post("/reset-password/:token", resetPassword);
+
+/**
+ * @swagger
+ * /auth/verify-email/{token}:
+ *   get:
+ *     summary: Verify email address (FR-002)
+ *     tags: [Auth]
+ *     parameters:
+ *       - in: path
+ *         name: token
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       '302':
+ *         description: Redirects to frontend /login?verified=true on success
+ *       '400':
+ *         description: Invalid or expired verification link
+ */
+router.get("/verify-email/:token", verifyEmail);
+
+/**
+ * @swagger
+ * /auth/resend-verification:
+ *   post:
+ *     summary: Resend email verification link (FR-002)
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email]
+ *             properties:
+ *               email:
+ *                 type: string
+ *     responses:
+ *       '200':
+ *         description: Verification email sent if account exists and is unverified
+ */
+router.post("/resend-verification", resendVerification);
 
 export default router;

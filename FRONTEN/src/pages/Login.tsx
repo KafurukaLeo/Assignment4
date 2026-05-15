@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { Eye, EyeOff, Lock, Mail } from "lucide-react";
 import axios from "axios";
 import { useAuthStore } from "../store/auth.store";
-import { api } from "../lib/api";
+import Logo from "../components/layout/Logo";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -21,11 +21,10 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      await login(email, password);
+      const data = await login(email, password);
       toast.success("Login successful");
 
-      const response = await api.get("/auth/me");
-      const user = response.data;
+      const { user } = data;
 
       if (redirect) {
         navigate(redirect);
@@ -37,8 +36,8 @@ export default function Login() {
         navigate("/");
       }
     } catch (error: unknown) {
-      const message = axios.isAxiosError<{ message?: string }>(error)
-        ? error.response?.data?.message
+      const message = axios.isAxiosError<{ message?: string; error?: string }>(error)
+        ? error.response?.data?.message || error.response?.data?.error
         : error instanceof Error
           ? error.message
           : "Login failed";
@@ -50,12 +49,8 @@ export default function Login() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-white px-4 py-10 dark:bg-[#0f1117]">
       <div className="w-full max-w-[420px]">
-        <Link
-          to="/"
-          className="inline-flex text-2xl font-bold text-gray-950 dark:text-white"
-        >
-          Air<span className="text-(--color-primary)">b</span>nb
-        </Link>
+        <Logo />
+
 
         <div className="mt-10">
           <p className="text-[12px] font-semibold uppercase tracking-widest text-gray-400">

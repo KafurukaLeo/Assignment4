@@ -57,7 +57,7 @@ export default function BookingForm() {
 
   const nights = getNights(checkIn, checkOut);
   const subtotal = listing ? Math.round(nights * listing.pricePerNight) : 0;
-  const serviceFee = nights > 0 ? 0 : 0;
+  const serviceFee = Math.round(subtotal * 0.1); // 10% service fee
   const totalPrice = subtotal + serviceFee;
   const today = new Date().toISOString().split("T")[0];
 
@@ -208,12 +208,14 @@ export default function BookingForm() {
 
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
               <DateInput
+                id="check-in-input"
                 label="Check-in"
                 value={checkIn}
                 min={today}
                 onChange={setCheckIn}
               />
               <DateInput
+                id="check-out-input"
                 label="Check-out"
                 value={checkOut}
                 min={checkIn || today}
@@ -292,20 +294,32 @@ export default function BookingForm() {
                   </span>
                 </p>
               </div>
-              <span className="rounded-full bg-(--color-primary)/10 px-3 py-1.5 text-[12px] font-semibold text-(--color-primary)">
-                Pending request
+              <span className="rounded-full bg-amber-500/10 px-3 py-1.5 text-[12px] font-semibold text-amber-600 dark:text-amber-400">
+                Request to Book
               </span>
             </div>
 
             <div className="mt-5 overflow-hidden rounded-2xl border border-gray-200 dark:border-white/[0.08]">
-              <SummaryField
-                label="Check-in"
-                value={checkIn ? formatDate(checkIn) : "Add date"}
-              />
-              <SummaryField
-                label="Check-out"
-                value={checkOut ? formatDate(checkOut) : "Add date"}
-              />
+              <button
+                type="button"
+                onClick={() => document.getElementById("check-in-input")?.focus()}
+                className="w-full text-left"
+              >
+                <SummaryField
+                  label="Check-in"
+                  value={checkIn ? formatDate(checkIn) : "Add date"}
+                />
+              </button>
+              <button
+                type="button"
+                onClick={() => document.getElementById("check-out-input")?.focus()}
+                className="w-full text-left"
+              >
+                <SummaryField
+                  label="Check-out"
+                  value={checkOut ? formatDate(checkOut) : "Add date"}
+                />
+              </button>
               <SummaryField
                 label="Guests"
                 value={`Up to ${listing.guests} guests`}
@@ -317,7 +331,7 @@ export default function BookingForm() {
                 label={`$${listing.pricePerNight} x ${nights} nights`}
                 value={`$${subtotal}`}
               />
-              <PriceLine label="Service fee" value={`$${serviceFee}`} />
+              <PriceLine label="Service fee (10%)" value={`$${serviceFee}`} />
               <div className="border-t border-gray-200 pt-3 dark:border-white/[0.08]">
                 <PriceLine label="Total" value={`$${totalPrice}`} strong />
               </div>
@@ -325,8 +339,8 @@ export default function BookingForm() {
 
             <button
               type="submit"
-              disabled={createBookingMutation.isPending || nights <= 0}
-              className="mt-5 w-full rounded-xl bg-(--color-primary) px-5 py-3.5 text-[14px] font-semibold text-white transition-colors hover:bg-(--color-primary-dark) disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={createBookingMutation.isPending}
+              className="mt-5 w-full rounded-xl bg-(--color-primary) px-5 py-3.5 text-[14px] font-bold text-white shadow-md transition-all hover:bg-(--color-primary-dark) active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {createBookingMutation.isPending
                 ? "Creating request..."
@@ -343,11 +357,13 @@ export default function BookingForm() {
 }
 
 function DateInput({
+  id,
   label,
   value,
   min,
   onChange,
 }: {
+  id?: string;
   label: string;
   value: string;
   min: string;
@@ -359,6 +375,7 @@ function DateInput({
         {label}
       </span>
       <input
+        id={id}
         type="date"
         value={value}
         onChange={(e) => onChange(e.target.value)}

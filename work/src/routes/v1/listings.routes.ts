@@ -1,6 +1,6 @@
 // Express Router — creates a modular route handler for listing endpoints
 import { Router } from "express";
-// Listing controller functions for CRUD, search, and stats
+// Listing controller functions for CRUD, search, stats, and publish
 import {
   getAllListings,
   getListingById,
@@ -9,9 +9,15 @@ import {
   updateListing,
   deleteListing,
   getListingStats,
+  publishListing,
+  createBlockedDate,
+  getBlockedDates,
+  deleteBlockedDate,
+  getMyListings,
 } from "../../controllers/listings.controller";
 // authenticate — verifies JWT token | requireHost — only hosts can create/edit/delete listings
 import { authenticate, requireHost } from "../../middlewares/auth.middleware";
+import upload from "../../config/multer";
 
 const router = Router();
 
@@ -211,7 +217,137 @@ router.get("/stats", getListingStats);
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
+router.get("/me", authenticate, getMyListings);
 router.get("/:id", getListingById);
+
+/**
+ * @swagger
+ * /listings/{id}/publish:
+ *   patch:
+ *     summary: Publish a listing (FR-021)
+ *     description: Changes listing status from draft to active, making it discoverable by guests.
+ *     tags: [Listings]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The listing ID
+ *     responses:
+ *       '200':
+ *         description: Listing published successfully
+ *       '403':
+ *         description: Only the listing owner or admin can publish
+ *       '404':
+ *         description: Listing not found
+ */
+router.patch("/:id/publish", authenticate, requireHost, publishListing);
+
+/**
+ * @swagger
+ * /listings/{id}/unpublish:
+ *   patch:
+ *     summary: Unpublish a listing (FR-021)
+ *     description: Changes listing status from active back to draft, hiding it from guests.
+ *     tags: [Listings]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The listing ID
+ *     responses:
+ *       '200':
+ *         description: Listing unpublished successfully
+ *       '403':
+ *         description: Only the listing owner or admin can unpublish
+ *       '404':
+ *         description: Listing not found
+ */
+router.patch("/:id/unpublish", authenticate, requireHost, publishListing);
+
+/**
+ * @swagger
+ * /listings/{id}/blocked-dates:
+ *   post:
+ *     summary: Block a date range for a listing (FR-018)
+ *     tags: [Listings]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [startDate, endDate]
+ *             properties:
+ *               startDate:
+ *                 type: string
+ *               endDate:
+ *                 type: string
+ *               reason:
+ *                 type: string
+ *     responses:
+ *       '201':
+ *         description: Dates blocked successfully
+ */
+router.post("/:id/blocked-dates", authenticate, requireHost, createBlockedDate);
+
+/**
+ * @swagger
+ * /listings/{id}/blocked-dates:
+ *   get:
+ *     summary: Get blocked dates for a listing (FR-018)
+ *     tags: [Listings]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       '200':
+ *         description: List of blocked dates
+ */
+router.get("/:id/blocked-dates", getBlockedDates);
+
+/**
+ * @swagger
+ * /listings/{id}/blocked-dates/{blockedDateId}:
+ *   delete:
+ *     summary: Remove a blocked date (FR-018)
+ *     tags: [Listings]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: path
+ *         name: blockedDateId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       '200':
+ *         description: Blocked dates removed successfully
+ */
+router.delete("/:id/blocked-dates/:blockedDateId", authenticate, requireHost, deleteBlockedDate);
 
 // POST route
 /**
@@ -254,7 +390,7 @@ router.get("/:id", getListingById);
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.post("/", authenticate, requireHost, createListing);
+router.post("/", authenticate, requireHost, upload.array("photos", 10), createListing);
 
 // PUT route
 /**
@@ -310,7 +446,7 @@ router.post("/", authenticate, requireHost, createListing);
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.put("/:id", authenticate, updateListing);
+router.put("/:id", authenticate, requireHost, upload.array("photos", 10), updateListing);
 
 // DELETE route
 /**
@@ -350,6 +486,6 @@ router.put("/:id", authenticate, updateListing);
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.delete("/:id", authenticate, deleteListing);
+router.delete("/:id", authenticate, requireHost, deleteListing);
 
 export default router;

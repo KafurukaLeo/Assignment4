@@ -9,6 +9,7 @@ import {
   DollarSign,
   Check,
   X,
+  Home,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
@@ -40,6 +41,7 @@ interface Booking {
   listing: {
     title: string;
     location: string;
+    photos: string[];
   };
   checkIn: string;
   checkOut: string;
@@ -55,7 +57,7 @@ export default function DashboardBooking() {
   const { data: response, isLoading } = useQuery({
     queryKey: ["host-bookings"],
     queryFn: async () => {
-      const response = await api.get("/bookings");
+      const response = await api.get("/bookings?mode=host");
       return response.data;
     },
   });
@@ -241,13 +243,24 @@ export default function DashboardBooking() {
                     </div>
                   </td>
                   <td className="py-3 px-4">
-                    <div>
-                      <p className="font-medium text-sm">
-                        {booking.listing?.title}
-                      </p>
-                      <p className="text-xs text-[#AAAAAA]">
-                        {booking.listing?.location}
-                      </p>
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg overflow-hidden bg-gray-100 shrink-0">
+                        {booking.listing?.photos?.[0] ? (
+                          <img src={booking.listing.photos[0]} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-gray-400">
+                            <Home className="w-4 h-4" />
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm">
+                          {booking.listing?.title}
+                        </p>
+                        <p className="text-xs text-[#AAAAAA]">
+                          {booking.listing?.location}
+                        </p>
+                      </div>
                     </div>
                   </td>
                   <td className="py-3 px-4">

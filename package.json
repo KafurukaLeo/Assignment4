@@ -1,0 +1,14 @@
+{
+  "name": "assignment4-root",
+  "version": "1.0.0",
+  "description": "Root configuration for Assignment 4",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
+    "dev:frontend": "npm run dev --prefix FRONTEN",
+    "dev:backend": "npm run dev --prefix work",
+    "install:all": "npm install --prefix FRONTEN && npm install --prefix work"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

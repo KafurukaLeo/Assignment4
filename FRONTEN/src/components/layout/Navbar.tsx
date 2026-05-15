@@ -14,14 +14,19 @@ import {
   ChevronDown,
   DollarSign,
   Users,
+  LayoutDashboard,
+  Bell,
+  Check,
+  ShieldCheck
 } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { api } from "../../lib/api";
 import ThemeToggle from "../ThemeToggle";
 import { useAuthStore } from "../../store/auth.store";
 import type { User as AuthUser } from "../../store/auth.store";
+import Logo from "./Logo";
 
 type Favorite = {
   id: string;
@@ -78,6 +83,20 @@ export default function Navbar() {
     retry: false,
   });
 
+  const { data: notificationsData, refetch: refetchNotifications } = useQuery({
+    queryKey: ["notifications"],
+    queryFn: async () => {
+      const res = await api.get("/notifications");
+      return res.data as { notifications: any[], unreadCount: number };
+    },
+    enabled: !!user,
+    refetchInterval: 5000
+  });
+
+  const unreadCount = notificationsData?.unreadCount || 0;
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const notificationRef = useRef<HTMLDivElement>(null);
+
   const favoritesCount = favorites?.length || 0;
 
   useEffect(() => {
@@ -98,6 +117,9 @@ export default function Navbar() {
       if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
         setIsSearchExpanded(false);
       }
+      if (notificationRef.current && !notificationRef.current.contains(e.target as Node)) {
+        setIsNotificationsOpen(false);
+      }
     };
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
@@ -117,14 +139,16 @@ export default function Navbar() {
 
   useEffect(() => {
     if (location.hash === "#contact") {
-      window.setTimeout(() => {
-        document.getElementById("contact")?.scrollIntoView({
-          behavior: "smooth",
-          block: "start",
-        });
-      }, 50);
+      // Use a longer delay to ensure the Home page has fully rendered its ContactSection
+      const timer = window.setTimeout(() => {
+        const el = document.getElementById("contact");
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }, 350);
+      return () => clearTimeout(timer);
     }
-  }, [location.hash]);
+  }, [location.hash, location.pathname]);
 
   const runSearch = () => {
     const params = new URLSearchParams();
@@ -152,19 +176,8 @@ export default function Navbar() {
       >
         <div className="mx-auto max-w-7xl px-4 md:px-8">
           <div className="flex h-[68px] items-center justify-between gap-4">
-            {/* Logo */}
-            <Link
-              to="/"
-              className="group flex items-center gap-2.5 shrink-0"
-              aria-label="Home"
-            >
-              <div className="relative w-9 h-9 rounded-2xl bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark,#c0392b)] flex items-center justify-center shadow-md shadow-[var(--color-primary)]/30 group-hover:scale-105 group-hover:shadow-lg group-hover:shadow-[var(--color-primary)]/40 transition-all duration-300">
-                <Compass className="w-4.5 h-4.5 text-white" strokeWidth={2.2} />
-              </div>
-              <span className="hidden sm:block text-[16px] font-bold tracking-tight text-gray-900 dark:text-white">
-                air<span className="text-[var(--color-primary)]">bnb</span>
-              </span>
-            </Link>
+            <Logo />
+
 
             {/* Desktop nav pills */}
             <nav className="hidden md:flex items-center gap-1 bg-gray-100/70 dark:bg-white/[0.06] rounded-full px-1.5 py-1.5">
@@ -234,6 +247,32 @@ export default function Navbar() {
             <div className="flex items-center gap-2">
               <ThemeToggle />
 
+              {/* Notifications */}
+              {user && (
+                <div className="relative" ref={notificationRef}>
+                  <button
+                    onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+                    className="relative flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 dark:border-white/[0.1] bg-white dark:bg-white/[0.05] text-gray-700 dark:text-gray-200 transition-all hover:shadow-md"
+                  >
+                    <Bell className="h-4 w-4" />
+                    {unreadCount > 0 && (
+                      <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--color-primary)] text-[9px] font-bold text-white ring-2 ring-white dark:ring-[#0a0a0f]">
+                        {unreadCount > 9 ? "9+" : unreadCount}
+                      </span>
+                    )}
+                  </button>
+
+                  {isNotificationsOpen && (
+                    <NotificationDropdown 
+                      notifications={notificationsData?.notifications || []} 
+                      unreadCount={unreadCount}
+                      onClose={() => setIsNotificationsOpen(false)}
+                      onRead={refetchNotifications}
+                    />
+                  )}
+                </div>
+              )}
+
               {/* Favorites pill (desktop) */}
               {user && (
                 <Link
@@ -248,6 +287,16 @@ export default function Navbar() {
                       {favoritesCount}
                     </span>
                   )}
+                </Link>
+              )}
+
+              {/* Become a Host / Host Dashboard link */}
+              {user && user.role !== "admin" && (
+                <Link
+                  to={user.role === "host" ? "/dashboard" : "/become-a-host"}
+                  className="hidden lg:flex items-center gap-2 px-4 py-2 rounded-full text-[13px] font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/[0.06] transition-all"
+                >
+                  {user.role === "host" ? "Switch to Hosting" : "Become a Host"}
                 </Link>
               )}
 
@@ -572,16 +621,30 @@ function ProfileMenu({
         <>
           <div className="px-4 py-3 flex items-center gap-3 border-b border-gray-50 dark:border-white/[0.05] mb-1">
             <Avatar user={user} size={36} />
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
-                {user.name}
-              </p>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                  {user.name}
+                </p>
+                <span className="shrink-0 px-1.5 py-0.5 rounded-md bg-gray-100 dark:bg-white/[0.1] text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-white/[0.05]">
+                  {user.role}
+                </span>
+              </div>
               <p className="text-xs text-gray-400 dark:text-gray-500 truncate">
                 {user.email}
               </p>
             </div>
           </div>
           <DropItem to="/profile" close={close} icon={User} label="Profile" />
+          {user.role === "admin" && (
+            <DropItem to="/admin" close={close} icon={LayoutDashboard} label="Admin Dashboard" />
+          )}
+          {user.role === "host" && (
+            <DropItem to="/dashboard" close={close} icon={LayoutDashboard} label="Host Dashboard" />
+          )}
+          {user.role === "guest" && (
+            <DropItem to="/become-a-host" close={close} icon={ShieldCheck} label="Become a Host" />
+          )}
           <DropItem
             to="/bookings"
             close={close}
@@ -646,10 +709,15 @@ function MobileMenu({
       {user && (
         <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-50 dark:border-white/[0.06]">
           <Avatar user={user} size={40} />
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
-              {user.name}
-            </p>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                {user.name}
+              </p>
+              <span className="shrink-0 px-1.5 py-0.5 rounded-md bg-gray-100 dark:bg-white/[0.1] text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-white/[0.05]">
+                {user.role}
+              </span>
+            </div>
             <p className="text-xs text-gray-400 truncate">{user.email}</p>
           </div>
         </div>
@@ -662,6 +730,33 @@ function MobileMenu({
           label="Homes"
           desc="Browse all listings"
         />
+        {user?.role === "admin" && (
+          <MobileItem
+            to="/admin"
+            close={close}
+            icon={LayoutDashboard}
+            label="Admin Dashboard"
+            desc="Manage the whole system"
+          />
+        )}
+        {user?.role === "host" && (
+          <MobileItem
+            to="/dashboard"
+            close={close}
+            icon={LayoutDashboard}
+            label="Host Dashboard"
+            desc="Manage your listings"
+          />
+        )}
+        {user?.role === "guest" && (
+          <MobileItem
+            to="/become-a-host"
+            close={close}
+            icon={ShieldCheck}
+            label="Become a Host"
+            desc="Start earning today"
+          />
+        )}
         <MobileItem
           to="/bookings"
           close={close}
@@ -810,5 +905,75 @@ function Avatar({ user, size }: { user: AuthUser | null; size: number }) {
     >
       {user.name?.charAt(0) || "U"}
     </span>
+  );
+}
+
+function NotificationDropdown({ 
+  notifications, 
+  unreadCount, 
+  onClose, 
+  onRead 
+}: { 
+  notifications: any[], 
+  unreadCount: number, 
+  onClose: () => void,
+  onRead: () => void
+}) {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const markReadMutation = useMutation({
+    mutationFn: () => api.patch("/notifications/read"),
+    onSuccess: () => {
+      onRead();
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    }
+  });
+
+  return (
+    <div className="absolute right-0 mt-3 w-[320px] rounded-2xl border border-gray-100 dark:border-white/[0.08] bg-white dark:bg-[#0e0e16] shadow-2xl shadow-black/10 overflow-hidden">
+      <div className="px-4 py-3 border-b border-gray-50 dark:border-white/[0.05] flex items-center justify-between">
+        <h3 className="text-sm font-bold">Notifications</h3>
+        {unreadCount > 0 && (
+          <button 
+            onClick={() => markReadMutation.mutate()}
+            className="text-[11px] font-semibold text-[var(--color-primary)] hover:underline flex items-center gap-1"
+          >
+            <Check size={12} />
+            Mark all read
+          </button>
+        )}
+      </div>
+      <div className="max-h-[360px] overflow-y-auto">
+        {notifications.length === 0 ? (
+          <div className="p-8 text-center">
+            <Bell className="mx-auto h-8 w-8 text-gray-200 mb-2" />
+            <p className="text-xs text-gray-400">No notifications yet</p>
+          </div>
+        ) : (
+          notifications.map((n: any) => (
+            <button
+              key={n.id}
+              onClick={() => {
+                if (n.link) navigate(n.link);
+                onClose();
+              }}
+              className={`w-full p-4 text-left hover:bg-gray-50 dark:hover:bg-white/[0.04] transition-colors flex gap-3 border-b border-gray-50 dark:border-white/[0.03] last:border-0 ${!n.isRead ? 'bg-gray-50/50 dark:bg-white/[0.02]' : ''}`}
+            >
+              <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 ${n.type === 'message' ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'}`}>
+                {n.type === 'message' ? <MessageCircle size={14} /> : <CalendarDays size={14} />}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className={`text-[13px] leading-tight mb-1 ${!n.isRead ? 'font-bold' : 'font-medium'}`}>{n.title}</p>
+                <p className="text-[12px] text-gray-500 dark:text-gray-400 line-clamp-2">{n.content}</p>
+                <p className="text-[10px] text-gray-400 mt-1.5">
+                  {new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(n.createdAt))}
+                </p>
+              </div>
+              {!n.isRead && <div className="w-2 h-2 rounded-full bg-[var(--color-primary)] mt-1 shrink-0" />}
+            </button>
+          ))
+        )}
+      </div>
+    </div>
   );
 }

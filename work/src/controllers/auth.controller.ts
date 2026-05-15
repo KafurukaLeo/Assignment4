@@ -6,7 +6,13 @@ import jwt from "jsonwebtoken";
 import type { AuthRequest } from "../middlewares/auth.middleware";
 import { formatListing } from "../utils/listing";
 import { sendEmail } from "../config/email";
-import { welcomeEmail, passwordResetEmail } from "../templates/email";
+import {
+  welcomeEmail,
+  passwordResetEmail,
+  emailVerificationEmail,
+  accountLockedEmail,
+} from "../templates/email";
+import { validatePassword } from "../utils/password";
 
 // Read JWT config from environment variables
 const JWT_SECRET = process.env["JWT_SECRET"] as string;
@@ -34,8 +40,13 @@ export const register = async (req: Request, res: Response) => {
     return res.status(400).json({ error: "name, email, username, and password are required" });
   }
 
-  if (password.length < 8) {
-    return res.status(400).json({ error: "Password must be at least 8 characters" });
+  const normalizedEmail = email.toLowerCase().trim();
+  const normalizedUsername = username.toLowerCase().trim();
+
+  // FR-003: full password complexity check (8+ chars, uppercase, digit, special char)
+  const passwordError = validatePassword(password);
+  if (passwordError) {
+    return res.status(400).json({ error: passwordError });
   }
 
   // Allow "host", "admin", or default to "guest"
@@ -47,38 +58,56 @@ export const register = async (req: Request, res: Response) => {
   try {
     // Check if email or username is already in use
     const exists = await prisma.user.findFirst({
-      where: { OR: [{ email }, { username }] },
+      where: { OR: [{ email: normalizedEmail }, { username: normalizedUsername }] },
     });
 
     if (exists) {
-      const conflict = exists.email === email ? "email" : "username";
+      const conflict = exists.email === normalizedEmail ? "email" : "username";
       return res.status(409).json({ error: `${conflict} is already taken`, conflict });
     }
 
     // Hash the password before storing — never store plain text passwords
     const hashed = await bcrypt.hash(password, 10);
+
+    // FR-002: generate a secure email verification token
+    const rawVerifToken = crypto.randomBytes(32).toString("hex");
+
     const user = await prisma.user.create({
-      data: { name, email, username, password: hashed, role: assignedRole as "host" | "guest" },
+      data: {
+        name, email: normalizedEmail, username: normalizedUsername, password: hashed, role: assignedRole,
+        emailVerified: false,
+        emailVerificationToken: rawVerifToken,
+      },
     });
 
+    // Sign JWT with userId and role so the user can be logged in automatically
+    const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, {
+      expiresIn: JWT_EXPIRES_IN,
+    } as jwt.SignOptions);
+
     // Remove sensitive fields before sending response
-    const { password: _, resetToken: __, resetTokenExpiry: ___, ...userWithoutPassword } = user;
+    const { password: _, resetToken: __, resetTokenExpiry: ___, emailVerificationToken: ____, ...userWithoutPassword } = user;
 
-    res.status(201).json({ message: "Registered successfully", user: userWithoutPassword });
+    res.status(201).json({ 
+      message: "Registered successfully. Please check your email to verify your account.", 
+      token, 
+      user: userWithoutPassword 
+    });
 
-    // Send welcome email after responding — failure here doesn't affect the registration
+    // Send welcome + verification emails after responding (non-blocking)
+    const verifyLink = `${process.env["API_URL"] ?? "http://localhost:3000"}/api/v1/auth/verify-email/${rawVerifToken}`;
     try {
-      await sendEmail({
-        to: user.email,
-        subject: "Welcome to Airbnb",
-        html: welcomeEmail(user.name, user.role),
-      });
+      await sendEmail({ to: user.email, subject: "Verify your Airbnb email", html: emailVerificationEmail(user.name, verifyLink) });
+      await sendEmail({ to: user.email, subject: "Welcome to Airbnb", html: welcomeEmail(user.name, user.role) });
     } catch (emailErr) {
-      console.error("Welcome email failed:", emailErr);
+      console.error("Welcome/verification email failed:", emailErr);
     }
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Error during registration" });
+    console.error("REGISTRATION ERROR:", error);
+    res.status(500).json({ 
+      error: "Error during registration", 
+      message: error instanceof Error ? error.message : "An unknown error occurred" 
+    });
   }
 };
 
@@ -96,18 +125,57 @@ export const login = async (req: Request, res: Response) => {
     return res.status(400).json({ error: "Email and password are required" });
   }
 
+  const normalizedEmail = email.toLowerCase().trim();
+
   try {
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
     if (!user) {
       // Use same error message as wrong password to prevent user enumeration
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
+    if (user.lockUntil && user.lockUntil > new Date()) {
+      const minutesLeft = Math.ceil((user.lockUntil.getTime() - Date.now()) / 60000);
+      return res.status(423).json({
+        error: `Account is temporarily locked. Try again in ${minutesLeft} minute${minutesLeft !== 1 ? "s" : ""}.`,
+        lockedUntil: user.lockUntil,
+      });
+    }
+
+    // Block banned users from logging in
+    if (user.status === "banned") {
+      return res.status(403).json({ 
+        error: "Your account has been banned by the administrator.",
+        status: "banned"
+      });
+    }
+
     // Compare provided password against the stored bcrypt hash
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) {
-      return res.status(401).json({ error: "Invalid credentials" });
+      // FR-005: increment failed attempts; lock after 5
+      const attempts = user.loginAttempts + 1;
+      const shouldLock = attempts >= 5;
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          loginAttempts: shouldLock ? 0 : attempts,
+          lockUntil: shouldLock ? new Date(Date.now() + 15 * 60 * 1000) : null,
+        },
+      });
+      if (shouldLock) {
+        // Fire-and-forget lockout email
+        sendEmail({ to: user.email, subject: "Your Airbnb account has been locked", html: accountLockedEmail(user.name) }).catch(console.error);
+        return res.status(423).json({ error: "Account locked after 5 failed attempts. Try again in 15 minutes." });
+      }
+      return res.status(401).json({ error: "Invalid credentials", attemptsRemaining: 5 - attempts });
     }
+
+    // Successful login — reset lockout counters
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { loginAttempts: 0, lockUntil: null },
+    });
 
     // Sign JWT with userId and role — used by authenticate middleware on protected routes
     const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, {
@@ -115,7 +183,7 @@ export const login = async (req: Request, res: Response) => {
     } as jwt.SignOptions);
 
     // Remove sensitive fields before sending response
-    const { password: _, resetToken: __, resetTokenExpiry: ___, ...userWithoutPassword } = user;
+    const { password: _, resetToken: __, resetTokenExpiry: ___, emailVerificationToken: ____, loginAttempts: _____, lockUntil: ______, ...userWithoutPassword } = user;
 
     res.json({ token, user: userWithoutPassword });
   } catch (error) {
@@ -134,19 +202,16 @@ export const login = async (req: Request, res: Response) => {
  */
 export const me = async (req: AuthRequest, res: Response) => {
   try {
-    let user;
-    if (req.role === "host") {
-      // Include listings for hosts so they can see what they own
-      user = await prisma.user.findUnique({ where: { id: req.userId! }, include: { listings: true } });
-    } else if (req.role === "guest") {
-      // Include bookings with listing details for guests
-      user = await prisma.user.findUnique({
-        where: { id: req.userId! },
-        include: { bookings: { include: { listing: true } } },
-      });
-    } else {
-      user = await prisma.user.findUnique({ where: { id: req.userId! } });
-    }
+    // Include both listings and bookings for all users to support multi-role accounts
+    const user = await prisma.user.findUnique({
+      where: { id: req.userId! },
+      include: {
+        listings: true,
+        bookings: {
+          include: { listing: true }
+        }
+      }
+    });
 
     if (!user) {
       return res.status(404).json({ error: "User not found" });
@@ -189,8 +254,10 @@ export const changePassword = async (req: AuthRequest, res: Response) => {
     return res.status(400).json({ error: "currentPassword and newPassword are required" });
   }
 
-  if (newPassword.length < 8) {
-    return res.status(400).json({ error: "New password must be at least 8 characters" });
+  // FR-003: full password complexity check
+  const passwordError = validatePassword(newPassword);
+  if (passwordError) {
+    return res.status(400).json({ error: passwordError });
   }
 
   try {
@@ -210,6 +277,35 @@ export const changePassword = async (req: AuthRequest, res: Response) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Error changing password" });
+  }
+};
+
+/**
+ * POST /api/v1/auth/assign-role
+ * Assigns a role to a user.
+ * - Admin only
+ */
+export const assignRole = async (req: Request, res: Response) => {
+  // Only admin can call this (middleware will enforce)
+  const { userId, role } = req.body as { userId?: string; role?: string };
+  if (!userId || !role) {
+    return res.status(400).json({ error: 'userId and role are required' });
+  }
+  // Validate role value
+  const allowedRoles = ['guest', 'host', 'admin'];
+  if (!allowedRoles.includes(role)) {
+    return res.status(400).json({ error: `Invalid role. Must be one of ${allowedRoles.join(', ')}` });
+  }
+  try {
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: { role: role as any },
+    });
+    const { password: _, resetToken: __, resetTokenExpiry: ___, ...userWithoutPassword } = updatedUser as any;
+    res.json({ message: 'Role updated', user: userWithoutPassword });
+  } catch (error) {
+    console.error('Assign role error:', error);
+    res.status(500).json({ error: 'Error assigning role' });
   }
 };
 
@@ -237,7 +333,7 @@ export const forgotPassword = async (req: Request, res: Response) => {
     // Generate a secure random token and hash it for storage
     const rawToken = crypto.randomBytes(32).toString("hex");
     const hashedToken = crypto.createHash("sha256").update(rawToken).digest("hex");
-    const expiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour from now
+    const expiry = new Date(Date.now() + 30 * 60 * 1000); // FR-006: 30 minutes (SRS requirement)
 
     await prisma.user.update({
       where: { id: user.id },
@@ -272,8 +368,10 @@ export const resetPassword = async (req: Request, res: Response) => {
     return res.status(400).json({ error: "Password is required" });
   }
 
-  if (password.length < 8) {
-    return res.status(400).json({ error: "Password must be at least 8 characters" });
+  // FR-003: full password complexity check
+  const passwordError = validatePassword(password);
+  if (passwordError) {
+    return res.status(400).json({ error: passwordError });
   }
 
   try {
@@ -304,5 +402,75 @@ export const resetPassword = async (req: Request, res: Response) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Error resetting password" });
+  }
+};
+
+/**
+ * GET /api/v1/auth/verify-email/:token
+ * FR-002: Verifies a user's email address using the token sent during registration.
+ * - Token is stored as plain text (not hashed) since it's a one-time-use link
+ * - Marks emailVerified = true and clears the verification token after use
+ */
+export const verifyEmail = async (req: Request, res: Response) => {
+  const token = req.params["token"] as string;
+
+  try {
+    const user = await prisma.user.findFirst({
+      where: { emailVerificationToken: token },
+    });
+
+    if (!user) {
+      return res.status(400).json({ error: "Invalid or expired verification link" });
+    }
+
+    if (user.emailVerified) {
+      return res.status(200).json({ message: "Email already verified" });
+    }
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { emailVerified: true, emailVerificationToken: null },
+    });
+
+    // Redirect to frontend after verification
+    const frontendUrl = process.env["FRONTEND_URL"] ?? "http://localhost:5173";
+    return res.redirect(`${frontendUrl}/login?verified=true`);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Error verifying email" });
+  }
+};
+
+/**
+ * POST /api/v1/auth/resend-verification
+ * FR-002: Resends the email verification link.
+ * - Generates a fresh token and sends a new verification email
+ */
+export const resendVerification = async (req: Request, res: Response) => {
+  const { email } = req.body as { email?: string };
+
+  if (!email) return res.status(400).json({ error: "Email is required" });
+
+  // Always respond the same way to prevent enumeration
+  res.json({ message: "If that email is registered and unverified, a new verification link has been sent" });
+
+  try {
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user || user.emailVerified) return;
+
+    const rawVerifToken = crypto.randomBytes(32).toString("hex");
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { emailVerificationToken: rawVerifToken },
+    });
+
+    const verifyLink = `${process.env["API_URL"] ?? "http://localhost:3000"}/api/v1/auth/verify-email/${rawVerifToken}`;
+    await sendEmail({
+      to: user.email,
+      subject: "Verify your Airbnb email",
+      html: emailVerificationEmail(user.name, verifyLink),
+    });
+  } catch (err) {
+    console.error("Resend verification error:", err);
   }
 };

@@ -2,8 +2,9 @@ import { type Request, type Response } from "express";
 import prisma from "../config/prisma";
 import type { AuthRequest } from "../middlewares/auth.middleware";
 import { sendEmail } from "../config/email";
-import { bookingConfirmationEmail, bookingCancellationEmail } from "../templates/email";
+import { bookingConfirmationEmail, bookingCancellationEmail, newBookingRequestEmail } from "../templates/email";
 import { formatListing } from "../utils/listing";
+import { createNotification } from "./notifications.controller";
 
 /**
  * GET /api/v1/bookings
@@ -11,23 +12,57 @@ import { formatListing } from "../utils/listing";
  * - Includes guest (id, name, email) and listing (id, title, location) details
  * - Supports page and limit query params (default: page=1, limit=10)
  */
-export const getAllBookings = async (req: Request, res: Response) => {
+export const getAllBookings = async (req: AuthRequest, res: Response) => {
   try {
     const page = Math.max(1, parseInt((req.query["page"] as string) ?? "1", 10));
     const limit = Math.max(1, parseInt((req.query["limit"] as string) ?? "10", 10));
+    const mode = req.query["mode"] as string;
+    const status = req.query["status"] as string;
     const skip = (page - 1) * limit;
+
+    const where: any = {};
+    
+    // Role-based filtering
+    if (req.role !== "admin") {
+      if (mode === "host") {
+        // Host mode: show bookings for listings owned by the host
+        where.listing = { hostId: req.userId };
+      } else {
+        // Default/Guest mode: show bookings made by the user
+        where.guestId = req.userId;
+      }
+    } else if (mode === "host") {
+      // Admin can also view in host mode if they want, but usually they see all
+      // For now, let's allow admin to filter by host if they provide a hostId
+      const hostId = req.query["hostId"] as string;
+      if (hostId) where.listing = { hostId };
+    }
+
+    // Handle tab filtering from frontend
+    const today = new Date();
+    if (status === "upcoming") {
+      where.checkOut = { gte: today };
+      where.status = { not: "cancelled" };
+    } else if (status === "past") {
+      where.checkOut = { lt: today };
+      where.status = { not: "cancelled" };
+    } else if (status === "cancelled") {
+      where.status = "cancelled";
+    }
 
     // Run count and fetch in parallel for better performance
     const [bookings, total] = await Promise.all([
       prisma.booking.findMany({
+        where,
         skip,
         take: limit,
         include: {
           guest: { select: { id: true, name: true, email: true } },
-          listing: { select: { id: true, title: true, location: true } },
+          listing: { select: { id: true, title: true, location: true, photos: true, pricePerNight: true } },
         },
+        orderBy: { createdAt: "desc" },
       }),
-      prisma.booking.count(),
+      prisma.booking.count({ where }),
     ]);
 
     res.json({ 
@@ -134,8 +169,8 @@ export const createBooking = async (req: AuthRequest, res: Response) => {
     return res.status(400).json({ error: "checkIn must be before checkOut" });
   }
 
-  if (checkInDate <= new Date()) {
-    return res.status(400).json({ error: "checkIn must be in the future" });
+  if (checkInDate < new Date(new Date().setHours(0, 0, 0, 0))) {
+    return res.status(400).json({ error: "checkIn must be today or in the future" });
   }
 
   try {
@@ -144,7 +179,9 @@ export const createBooking = async (req: AuthRequest, res: Response) => {
 
     // Calculate total price: number of nights × price per night
     const nights = Math.ceil((checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24));
-    const totalPrice = nights * listing.pricePerNight;
+    const subtotal = nights * listing.pricePerNight;
+    const serviceFee = Math.round(subtotal * 0.1);
+    const totalPrice = subtotal + serviceFee;
     const guestId = req.userId!;
 
     // Use a transaction to atomically check for conflicts and create the booking
@@ -174,6 +211,15 @@ export const createBooking = async (req: AuthRequest, res: Response) => {
       });
     });
 
+    // Notify Host of new booking
+    await createNotification(
+      listing.hostId,
+      "New Booking Request",
+      `You have a new booking request for ${listing.title} from ${booking.guest.name}`,
+      "booking",
+      "/dashboard/bookings"
+    );
+
     res.status(201).json({ ...booking, listing: formatListing(booking.listing) });
 
     // Send confirmation email after responding — failure here doesn't affect the booking
@@ -195,6 +241,26 @@ export const createBooking = async (req: AuthRequest, res: Response) => {
       }
     } catch (emailErr) {
       console.error("Booking confirmation email failed:", emailErr);
+    }
+
+    // Send email to Host (best-effort)
+    try {
+      const host = await prisma.user.findUnique({ where: { id: listing.hostId } });
+      if (host) {
+        await sendEmail({
+          to: host.email,
+          subject: "New Booking Request Received",
+          html: newBookingRequestEmail(
+            host.name,
+            booking.guest.name,
+            listing.title,
+            checkInDate.toDateString(),
+            checkOutDate.toDateString(),
+          ),
+        });
+      }
+    } catch (hostEmailErr) {
+      console.error("Host booking notification email failed:", hostEmailErr);
     }
   } catch (error) {
     if (error instanceof Error && error.message === "BOOKING_CONFLICT") {
@@ -239,6 +305,19 @@ export const deleteBooking = async (req: AuthRequest, res: Response) => {
       data: { status: "cancelled" },
     });
 
+    // Notify the other party
+    const isGuestCancelling = booking.guestId === req.userId;
+    const recipientId = isGuestCancelling ? booking.listing.hostId : booking.guestId;
+    const actorName = isGuestCancelling ? "Guest" : "Admin";
+
+    await createNotification(
+      recipientId,
+      "Booking Cancelled",
+      `The booking for ${booking.listing.title} has been cancelled by the ${actorName}.`,
+      "booking",
+      isGuestCancelling ? "/dashboard/bookings" : "/bookings"
+    );
+
     res.json({ message: "Booking cancelled successfully", data: updated });
 
     // Send cancellation email after responding — failure here doesn't affect the cancellation
@@ -272,7 +351,7 @@ export const deleteBooking = async (req: AuthRequest, res: Response) => {
  * - Returns 400 if status is missing or invalid
  * - Returns 404 if booking doesn't exist
  */
-export const updateBookingStatus = async (req: Request, res: Response) => {
+export const updateBookingStatus = async (req: AuthRequest, res: Response) => {
   const id = req.params["id"] as string;
   const { status } = req.body as { status?: string };
 
@@ -284,8 +363,17 @@ export const updateBookingStatus = async (req: Request, res: Response) => {
   }
 
   try {
-    const booking = await prisma.booking.findUnique({ where: { id } });
+    const booking = await prisma.booking.findUnique({ 
+      where: { id },
+      include: { listing: true }
+    });
+    
     if (!booking) return res.status(404).json({ error: "Booking not found" });
+
+    // Only the host who owns the listing or an admin can update the status
+    if (booking.listing.hostId !== req.userId && req.role !== "admin") {
+      return res.status(403).json({ error: "Only the host can update the booking status" });
+    }
 
     const updated = await prisma.booking.update({
       where: { id },
@@ -297,5 +385,246 @@ export const updateBookingStatus = async (req: Request, res: Response) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Error updating booking status" });
+  }
+};
+
+/**
+ * PATCH /api/v1/bookings/:id/accept
+ * FR-033/034: Host accepts a pending booking request.
+ * - Fails if booking is older than 24 hours.
+ */
+export const acceptBooking = async (req: AuthRequest, res: Response) => {
+  const id = req.params["id"] as string;
+
+  try {
+    const booking = await prisma.booking.findUnique({
+      where: { id },
+      include: { listing: true, guest: true },
+    });
+
+    if (!booking) return res.status(404).json({ error: "Booking not found" });
+
+    if (booking.listing.hostId !== req.userId && req.role !== "admin") {
+      return res.status(403).json({ error: "Only the host can accept this booking" });
+    }
+
+    if (booking.status !== "pending") {
+      return res.status(400).json({ error: "Only pending bookings can be accepted" });
+    }
+
+    // FR-034: Auto-expiry after 24 hours
+    const hoursSinceCreation = (Date.now() - booking.createdAt.getTime()) / (1000 * 60 * 60);
+    if (hoursSinceCreation > 24) {
+      await prisma.booking.update({ where: { id }, data: { status: "cancelled" } });
+      return res.status(400).json({ error: "Booking request has expired (older than 24 hours) and is now cancelled" });
+    }
+
+    const updated = await prisma.booking.update({
+      where: { id },
+      data: { status: "confirmed" },
+      include: { guest: true, listing: true },
+    });
+
+    // Notify Guest
+    await createNotification(
+      booking.guestId,
+      "Booking Accepted",
+      `Your booking for ${booking.listing.title} has been accepted by the host!`,
+      "booking",
+      "/bookings"
+    );
+
+    // Notify guest (best-effort)
+    sendEmail({
+      to: booking.guest.email,
+      subject: "Booking Request Accepted",
+      html: bookingConfirmationEmail(
+        booking.guest.name,
+        booking.listing.title,
+        booking.listing.location,
+        booking.checkIn.toDateString(),
+        booking.checkOut.toDateString(),
+        booking.totalPrice
+      ),
+    }).catch(console.error);
+
+    res.json({ message: "Booking accepted successfully", data: { ...updated, listing: formatListing(updated.listing) } });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Error accepting booking" });
+  }
+};
+
+/**
+ * PATCH /api/v1/bookings/:id/decline
+ * FR-033/034: Host declines a pending booking request.
+ */
+export const declineBooking = async (req: AuthRequest, res: Response) => {
+  const id = req.params["id"] as string;
+
+  try {
+    const booking = await prisma.booking.findUnique({
+      where: { id },
+      include: { listing: true, guest: true },
+    });
+
+    if (!booking) return res.status(404).json({ error: "Booking not found" });
+
+    if (booking.listing.hostId !== req.userId && req.role !== "admin") {
+      return res.status(403).json({ error: "Only the host can decline this booking" });
+    }
+
+    if (booking.status !== "pending") {
+      return res.status(400).json({ error: "Only pending bookings can be declined" });
+    }
+
+    const updated = await prisma.booking.update({
+      where: { id },
+      data: { status: "cancelled" }, // Map declined to cancelled for simplicity
+      include: { guest: true, listing: true },
+    });
+
+    // Notify Guest
+    await createNotification(
+      booking.guestId,
+      "Booking Declined",
+      `Your booking request for ${booking.listing.title} was declined.`,
+      "booking",
+      "/bookings"
+    );
+
+    // Notify guest (best-effort)
+    sendEmail({
+      to: booking.guest.email,
+      subject: "Booking Request Declined",
+      html: bookingCancellationEmail(
+        booking.guest.name,
+        booking.listing.title,
+        booking.checkIn.toDateString(),
+        booking.checkOut.toDateString()
+      ),
+    }).catch(console.error);
+
+    res.json({ message: "Booking declined successfully", data: { ...updated, listing: formatListing(updated.listing) } });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Error declining booking" });
+  }
+};
+
+/**
+ * PATCH /api/v1/bookings/:id/dates
+ * FR-039: Modify booking dates.
+ * - Changes checkIn and checkOut, subject to host approval (resets status to pending).
+ */
+export const modifyBookingDates = async (req: AuthRequest, res: Response) => {
+  const id = req.params["id"] as string;
+  const { checkIn, checkOut } = req.body as { checkIn?: string; checkOut?: string };
+
+  if (!checkIn || !checkOut) return res.status(400).json({ error: "checkIn and checkOut are required" });
+
+  const checkInDate = new Date(checkIn);
+  const checkOutDate = new Date(checkOut);
+
+  if (isNaN(checkInDate.getTime()) || isNaN(checkOutDate.getTime()) || checkInDate >= checkOutDate) {
+    return res.status(400).json({ error: "Invalid dates" });
+  }
+
+  if (checkInDate < new Date(new Date().setHours(0, 0, 0, 0))) {
+    return res.status(400).json({ error: "checkIn must be today or in the future" });
+  }
+
+  try {
+    const booking = await prisma.booking.findUnique({
+      where: { id },
+      include: { listing: true },
+    });
+
+    if (!booking) return res.status(404).json({ error: "Booking not found" });
+
+    if (booking.guestId !== req.userId && req.role !== "admin") {
+      return res.status(403).json({ error: "Only the guest who made the booking can modify it" });
+    }
+
+    if (booking.status === "cancelled") {
+      return res.status(400).json({ error: "Cannot modify a cancelled booking" });
+    }
+
+    const nights = Math.ceil((checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24));
+    const subtotal = nights * booking.listing.pricePerNight;
+    const serviceFee = Math.round(subtotal * 0.1);
+    const totalPrice = subtotal + serviceFee;
+
+    const updated = await prisma.$transaction(async (tx) => {
+      // Check for conflicts excluding the current booking
+      const conflict = await tx.booking.findFirst({
+        where: {
+          id: { not: id },
+          listingId: booking.listingId,
+          status: { in: ["confirmed", "pending"] },
+          checkIn: { lt: checkOutDate },
+          checkOut: { gt: checkInDate },
+        },
+      });
+
+      // Also check blocked dates
+      const blockedConflict = await tx.blocked_date.findFirst({
+        where: {
+          listingId: booking.listingId,
+          startDate: { lt: checkOutDate },
+          endDate: { gt: checkInDate },
+        },
+      });
+
+      if (conflict || blockedConflict) throw new Error("BOOKING_CONFLICT");
+
+      return tx.booking.update({
+        where: { id },
+        data: {
+          checkIn: checkInDate,
+          checkOut: checkOutDate,
+          totalPrice,
+          status: "pending", // Modification requires host re-approval
+        },
+        include: { guest: true, listing: true },
+      });
+    });
+
+    // Notify Host of modification
+    await createNotification(
+      booking.listing.hostId,
+      "Booking Modified",
+      `A guest has modified their booking dates for ${booking.listing.title} and is awaiting your approval.`,
+      "booking",
+      "/dashboard/bookings"
+    );
+
+    // Send email to Host (best-effort)
+    try {
+      const host = await prisma.user.findUnique({ where: { id: booking.listing.hostId } });
+      if (host) {
+        await sendEmail({
+          to: host.email,
+          subject: "Booking Dates Modified",
+          html: newBookingRequestEmail(
+            host.name,
+            updated.guest.name,
+            booking.listing.title,
+            checkInDate.toDateString(),
+            checkOutDate.toDateString(),
+          ),
+        });
+      }
+    } catch (hostEmailErr) {
+      console.error("Host modification notification email failed:", hostEmailErr);
+    }
+
+    res.json({ message: "Booking dates modified and pending host approval", data: { ...updated, listing: formatListing(updated.listing) } });
+  } catch (error) {
+    if (error instanceof Error && error.message === "BOOKING_CONFLICT") {
+      return res.status(409).json({ error: "Listing is already booked or blocked for those dates" });
+    }
+    console.error(error);
+    res.status(500).json({ error: "Error modifying booking dates" });
   }
 };

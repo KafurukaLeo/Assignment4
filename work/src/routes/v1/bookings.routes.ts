@@ -8,9 +8,12 @@ import {
   createBooking,
   deleteBooking,
   updateBookingStatus,
+  acceptBooking,
+  declineBooking,
+  modifyBookingDates,
 } from "../../controllers/bookings.controller";
-// authenticate — verifies JWT token | requireGuest — only guests can create bookings
-import { authenticate, requireGuest } from "../../middlewares/auth.middleware";
+// authenticate — verifies JWT token | requireGuest/requireHost — role-based protection
+import { authenticate, requireGuest, requireHost } from "../../middlewares/auth.middleware";
 
 const router = Router();
 
@@ -381,6 +384,78 @@ router.post("/", authenticate, requireGuest, createBooking);
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.patch("/:id/status", authenticate, updateBookingStatus);
+
+/**
+ * @swagger
+ * /bookings/{id}/accept:
+ *   patch:
+ *     summary: Accept a booking request (FR-033/034)
+ *     tags: [Bookings]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       '200':
+ *         description: Booking accepted successfully
+ */
+router.patch("/:id/accept", authenticate, requireHost, acceptBooking);
+
+/**
+ * @swagger
+ * /bookings/{id}/decline:
+ *   patch:
+ *     summary: Decline a booking request (FR-033/034)
+ *     tags: [Bookings]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       '200':
+ *         description: Booking declined successfully
+ */
+router.patch("/:id/decline", authenticate, requireHost, declineBooking);
+
+/**
+ * @swagger
+ * /bookings/{id}/dates:
+ *   patch:
+ *     summary: Modify booking dates (FR-039)
+ *     tags: [Bookings]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [checkIn, checkOut]
+ *             properties:
+ *               checkIn:
+ *                 type: string
+ *               checkOut:
+ *                 type: string
+ *     responses:
+ *       '200':
+ *         description: Booking dates modified
+ */
+router.patch("/:id/dates", authenticate, modifyBookingDates);
 
 // DELETE route
 /**

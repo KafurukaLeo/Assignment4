@@ -4,6 +4,7 @@ import ThemeToggle from "../ThemeToggle";
 import { Link } from "react-router-dom";
 import { useState } from "react";
 import { useAuthStore, type User as AuthUser } from "../../store/auth.store";
+import Logo from "./Logo";
 
 interface HeaderProps {
   setIsOpen: (isOpen: boolean) => void;
@@ -18,12 +19,16 @@ export default function Header({ setIsOpen, user }: HeaderProps) {
   return (
     <div className="flex items-center justify-between h-14 px-4 bg-white dark:bg-[#1A1A1A] border-b border-[#EBEBEB] dark:border-[#2A2A2A] sticky top-0 z-10">
       {/* Left */}
-      <button
-        onClick={() => setIsOpen(true)}
-        className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-[#F5F5F5] dark:hover:bg-[#2A2A2A] transition-colors md:hidden"
-      >
-        <Menu className="w-4 h-4 text-[#717171]" />
-      </button>
+      <div className="flex items-center gap-3">
+        <button
+          onClick={() => setIsOpen(true)}
+          className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-[#F5F5F5] dark:hover:bg-[#2A2A2A] transition-colors md:hidden"
+        >
+          <Menu className="w-4 h-4 text-[#717171]" />
+        </button>
+        <Logo className="md:hidden scale-75 -ml-2" showText={false} />
+      </div>
+
 
       {/* Right */}
       <div className="flex items-center gap-2 ml-auto">

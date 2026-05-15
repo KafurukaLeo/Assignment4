@@ -9,9 +9,16 @@ import {
   deleteUser,
   getCurrentUser,
   updateCurrentUser,
+  toggleUserBan,
+  getHosts,
+  updateHostStatus,
+  applyToBecomeHost,
+  getFavorites,
+  addFavorite,
+  removeFavorite,
 } from "../../controllers/user.controller";
 // authenticate middleware — verifies JWT token for protected routes
-import { authenticate } from "../../middlewares/auth.middleware";
+import { authenticate, requireAdmin } from "../../middlewares/auth.middleware";
 
 const router = Router();
 
@@ -110,42 +117,23 @@ router.put("/me", authenticate, updateCurrentUser);
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.get("/", authenticate, getAllUsers);
+router.get("/", authenticate, requireAdmin, getAllUsers);
 
 /**
- * @swagger
- * /users/{id}:
- *   get:
- *     summary: Get a user by ID
- *     tags: [Users]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *         description: The user ID
- *     responses:
- *       '200':
- *         description: User found
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/User'
- *       '401':
- *         description: Unauthorized
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       '404':
- *         description: User not found
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
+ * GET /users/hosts
+ * List all hosts for approval (admin only)
+ */
+router.get("/hosts", authenticate, requireAdmin, getHosts);
+
+/**
+ * POST /users/become-host
+ * Apply for host status
+ */
+router.post("/become-host", authenticate, applyToBecomeHost);
+
+/**
+ * GET /users/:id
+ * Returns a single user by their ID.
  */
 router.get("/:id", authenticate, getUserById);
 
@@ -181,7 +169,7 @@ router.get("/:id", authenticate, getUserById);
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.post("/", createUser);
+router.post("/", authenticate, requireAdmin, createUser);
 
 /**
  * @swagger
@@ -230,7 +218,7 @@ router.post("/", createUser);
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.put("/:id", authenticate, updateUser);
+router.put("/:id", authenticate, requireAdmin, updateUser);
 
 /**
  * @swagger
@@ -263,6 +251,19 @@ router.put("/:id", authenticate, updateUser);
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.delete("/:id", authenticate, deleteUser);
+router.delete("/:id", authenticate, requireAdmin, deleteUser);
+
+/**
+ * PATCH /users/:id/ban
+ * Toggles user ban status (admin only)
+ */
+router.patch("/:id/ban", authenticate, requireAdmin, toggleUserBan);
+
+router.patch("/hosts/:id/status", authenticate, requireAdmin, updateHostStatus);
+
+router.get("/favorites", authenticate, getFavorites);
+router.post("/favorites/:listingId", authenticate, addFavorite);
+router.delete("/favorites/:listingId", authenticate, removeFavorite);
 
 export default router;
+

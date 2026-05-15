@@ -1,4 +1,5 @@
 import { Globe2, DollarSign } from "lucide-react";
+import Logo from "./Logo";
 
 export default function Footer() {
   return (
@@ -6,9 +7,7 @@ export default function Footer() {
       <div className="mx-auto max-w-screen-xl border-t border-gray-200 pt-6 dark:border-white/[0.08]">
         <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
           <div>
-            <p className="text-[14px] font-semibold text-gray-950 dark:text-white">
-              Air<span className="text-(--color-primary)">b</span>nb
-            </p>
+            <Logo className="scale-75 origin-left mb-1" />
             <p className="mt-1 text-[13px] text-gray-500 dark:text-gray-400">
               &copy; {new Date().getFullYear()} Airbnb. All rights reserved.
             </p>

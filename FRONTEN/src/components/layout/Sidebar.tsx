@@ -1,7 +1,9 @@
 import { Link, useLocation } from "react-router-dom";
-import { ChevronLeft, X } from "lucide-react";
+import { ChevronLeft, X, ShieldCheck } from "lucide-react";
 import { AdminLinks, DashboardLinks } from "../../data";
 import { useAuthStore } from "../../store/auth.store";
+import Logo from "./Logo";
+
 
 interface NavLinksProps {
   activeLink: string;
@@ -11,7 +13,16 @@ interface NavLinksProps {
 }
 
 const NavLinks = ({ activeLink, collapsed, role, onClickLink }: NavLinksProps) => {
-  const links = role === "admin" ? AdminLinks : DashboardLinks;
+  let links = role === "admin" ? AdminLinks : DashboardLinks;
+
+  if (role === "guest") {
+    links = links.filter(link => link.url !== "/dashboard/listings");
+    links.push({
+      title: "Become a Host",
+      url: "/become-a-host",
+      icon: ShieldCheck,
+    });
+  }
 
   return (
     <div className="flex flex-col gap-1 px-3">
@@ -75,14 +86,10 @@ export default function Sidebar({
             collapsed ? "justify-center" : "justify-between"
           }`}
         >
-          {!collapsed && (
-            <span
-              style={{ fontFamily: "'Playfair Display', serif" }}
-              className="text-[16px] font-semibold text-[#111] dark:text-white"
-            >
-              {title}
-            </span>
-          )}
+          <Logo 
+            className={`${collapsed ? "scale-75" : "scale-90"}`} 
+            showText={!collapsed} 
+          />
           <button
             onClick={() => setCollapsed(!collapsed)}
             className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-[#F5F5F5] dark:hover:bg-[#2A2A2A] transition-colors"
@@ -115,12 +122,7 @@ export default function Sidebar({
         }`}
       >
         <div className="flex items-center justify-between h-14 px-4 border-b border-[#EBEBEB] dark:border-[#2A2A2A]">
-          <span
-            style={{ fontFamily: "'Playfair Display', serif" }}
-            className="text-[16px] font-semibold text-[#111] dark:text-white"
-          >
-            {title}
-          </span>
+          <Logo className="scale-90" />
           <button
             onClick={() => setIsOpen(false)}
             className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-[#F5F5F5] dark:hover:bg-[#2A2A2A] transition-colors"

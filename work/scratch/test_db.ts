@@ -1,6 +1,5 @@
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
-import { PrismaPg } from "@prisma/adapter-pg";
 
 async function test() {
   const connectionString = (process.env["DATABASE_POOLER_URL"] ?? process.env["DATABASE_URL"]) as string;
@@ -12,12 +11,12 @@ async function test() {
   }
 
   try {
-    const adapter = new PrismaPg({ connectionString });
-    const prisma = new PrismaClient({ adapter });
+    const prisma = new PrismaClient();
     await prisma.$connect();
     console.log("Prisma connected successfully");
     const count = await prisma.listing.count();
     console.log("Listing count:", count);
+    await prisma.$disconnect();
   } catch (err) {
     console.error("Connection failed:", err);
   }

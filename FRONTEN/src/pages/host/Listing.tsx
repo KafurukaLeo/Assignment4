@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { toast } from "sonner";
 import {
   Search,
   SlidersHorizontal,
@@ -111,9 +112,10 @@ export default function DashboardListing() {
         ["listings", "me", pagination.page, pagination.limit],
         context?.previousData,
       );
-      alert("Failed to delete listing. Please try again.");
+      toast.error("Failed to delete listing. Please try again.");
     },
     onSettled: () => {
+      toast.success("Listing deleted successfully");
       queryClient.invalidateQueries({
         queryKey: ["listings", "me", pagination.page, pagination.limit],
       });
@@ -121,7 +123,7 @@ export default function DashboardListing() {
   });
 
   const handleDelete = (id: string) => {
-    if (confirm("Are you sure you want to delete this listing?")) {
+    if (window.confirm("Are you sure you want to delete this listing?")) {
       deleteMutation.mutate(id);
     }
   };
@@ -337,8 +339,19 @@ export default function DashboardListing() {
                           : ""
                       }`}
                     >
-                      <td className="px-4 py-3.5 font-medium text-[#111] dark:text-white max-w-[180px] truncate">
-                        {listing.title || "Untitled"}
+                      <td className="px-4 py-3.5 font-medium text-[#111] dark:text-white max-w-[200px]">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-lg overflow-hidden bg-gray-100 shrink-0">
+                            {listing.photos?.[0] ? (
+                              <img src={listing.photos[0]} className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                <Home className="w-4 h-4" />
+                              </div>
+                            )}
+                          </div>
+                          <span className="truncate">{listing.title || "Untitled"}</span>
+                        </div>
                       </td>
                       <td className="px-4 py-3.5 text-[#717171]">
                         <span className="flex items-center gap-1.5">

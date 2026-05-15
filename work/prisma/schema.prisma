@@ -8,52 +8,94 @@ datasource db {
 }
 
 model user {
-  id               String    @id @default(uuid())
-  name             String
-  email            String    @unique
-  username         String    @unique
-  phone            String?   @unique
-  role             String    @default("guest")
-  avatar           String?
-  bio              String?
-  password         String
-  resetToken       String?
-  resetTokenExpiry DateTime?
-  listings         listing[]
-  bookings         booking[]
-  reviews          review[]
-  sentMessages     message[] @relation("SentMessages")
-  receivedMessages message[] @relation("ReceivedMessages")
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  id                       String    @id @default(uuid())
+  name                     String
+  email                    String    @unique
+  username                 String    @unique
+  phone                    String?   @unique
+  role                     String    @default("guest")
+  status                   String    @default("active")  // active | banned
+  hostStatus               String    @default("pending") // pending | approved | restricted
+  avatar                   String?
+  bio                      String?
+  password                 String
+  resetToken               String?
+  resetTokenExpiry         DateTime?
+  // FR-002: email verification
+  emailVerified            Boolean   @default(false)
+  emailVerificationToken   String?
+  // FR-005: login lockout
+  loginAttempts            Int       @default(0)
+  lockUntil                DateTime?
+  listings                 listing[]
+  bookings                 booking[]
+  reviews                  review[]
+  sentMessages             message[] @relation("SentMessages")
+  receivedMessages         message[] @relation("ReceivedMessages")
+  notifications            notification[]
+  favorites                favorite[]
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
 
   @@index([role])
 }
 
+model favorite {
+  id        String   @id @default(uuid())
+  userId    String
+  listingId String
+  user      user     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listing   listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, listingId])
+  @@index([userId])
+  @@index([listingId])
+}
+
 model listing {
-  id            String      @id @default(uuid())
-  title         String
-  description   String
-  location      String
-  pricePerNight Float
-  guests        Int
-  type          String
-  amenities     String
-  photos        String
-  rating        Float?
-  hostId        String
-  host          user        @relation(fields: [hostId], references: [id])
-  bookings      booking[]
-  reviews       review[]
-  messages      message[]
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  id                 String         @id @default(uuid())
+  title              String
+  description        String
+  location           String
+  pricePerNight      Float
+  guests             Int
+  type               String
+  amenities          String
+  photos             String
+  rating             Float?
+  status             String         @default("draft")        // FR-021: "draft" | "active"
+  cancellationPolicy String         @default("flexible")     // FR-017: flexible | moderate | strict | non-refundable | long-term
+  hostId             String
+  host               user           @relation(fields: [hostId], references: [id])
+  bookings           booking[]
+  reviews            review[]
+  messages           message[]
+  blockedDates       blocked_date[]
+  favorites          favorite[]
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
 
   @@index([hostId])
   @@index([location])
   @@index([type])
   @@index([pricePerNight])
   @@index([type, location])
+  @@index([status])
+}
+
+// FR-018: Availability calendar — hosts can block date ranges on a listing
+model blocked_date {
+  id        String   @id @default(uuid())
+  listingId String
+  startDate DateTime
+  endDate   DateTime
+  reason    String?  // optional note (e.g. "maintenance", "personal use")
+  listing   listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([listingId])
+  @@index([startDate, endDate])
 }
 
 model booking {
@@ -102,5 +144,21 @@ model message {
   @@index([senderId])
   @@index([receiverId])
   @@index([listingId])
+  @@index([createdAt])
+}
+
+model notification {
+  id        String   @id @default(uuid())
+  title     String
+  content   String
+  type      String   // message | booking | system
+  isRead    Boolean  @default(false)
+  link      String?  // optional link to navigate to
+  userId    String
+  user      user     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([isRead])
   @@index([createdAt])
 }

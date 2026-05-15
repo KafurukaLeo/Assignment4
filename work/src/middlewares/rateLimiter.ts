@@ -7,7 +7,7 @@ import rateLimit from "express-rate-limit";
  */
 export const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes in milliseconds
-  max: 100,                  // max 100 requests per window per IP
+  max: 10000,                  // Increased for development
   message: { success: false, message: "Too many requests, please try again after 15 minutes." },
   standardHeaders: true,     // Return rate limit info in RateLimit-* headers
   legacyHeaders: false,      // Disable X-RateLimit-* headers (deprecated)
@@ -21,7 +21,7 @@ export const generalLimiter = rateLimit({
  */
 export const strictLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes in milliseconds
-  max: 20,                   // max 20 POST requests per window per IP
+  max: 10000,                   // Increased for development
   message: { success: false, message: "Too many requests, please try again after 15 minutes." },
   standardHeaders: true,
   legacyHeaders: false,

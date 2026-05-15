@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import axios from "axios";
 import { KeyRound, Mail } from "lucide-react";
 import { api } from "../lib/api";
+import Logo from "../components/layout/Logo";
 
 export default function ForgotPassword() {
   const navigate = useNavigate();
@@ -32,12 +33,8 @@ export default function ForgotPassword() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-white px-4 py-10 dark:bg-[#0f1117]">
       <div className="w-full max-w-[420px]">
-        <Link
-          to="/"
-          className="inline-flex text-2xl font-bold text-gray-950 dark:text-white"
-        >
-          Air<span className="text-(--color-primary)">b</span>nb
-        </Link>
+        <Logo />
+
 
         <div className="mt-10">
           <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-(--color-primary)/10 text-(--color-primary)">

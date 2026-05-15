@@ -10,6 +10,7 @@ import {
   Menu,
 } from "lucide-react";
 import { useState } from "react";
+import Logo from "./layout/Logo";
 
 export default function RoleBasedNav() {
   const { user, logout } = useAuthStore();
@@ -30,9 +31,7 @@ export default function RoleBasedNav() {
     return (
       <nav className="bg-white p-4">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <Link to="/" className="text-2xl font-bold text-blue-600">
-            Airbnb
-          </Link>
+          <Logo />
           <div className="flex gap-4">
             <Link to="/login" className="px-4 py-2 bg-blue-500 text-white">
               Login
@@ -50,9 +49,10 @@ export default function RoleBasedNav() {
     return (
       <nav className="bg-white p-4">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <Link to="/dashboard" className="text-2xl font-bold text-blue-600">
-            Airbnb Host
-          </Link>
+          <div className="flex items-center gap-2">
+            <Logo />
+            <span className="bg-blue-100 text-blue-600 text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">Host</span>
+          </div>
 
           <div className="hidden md:flex gap-6">
             <Link
@@ -164,9 +164,7 @@ export default function RoleBasedNav() {
   return (
     <nav className="bg-white p-4">
       <div className="max-w-7xl mx-auto flex justify-between items-center">
-        <Link to="/" className="text-2xl font-bold text-blue-600">
-          Airbnb
-        </Link>
+          <Logo />
 
         <div className="hidden md:flex gap-6">
           {guestNavItems.map((item) => {
@@ -204,7 +202,7 @@ export default function RoleBasedNav() {
               )}
             </div>
             <span className="text-sm font-medium">{user.name}</span>
-            <span className="text-xs text-gray-500">(guest)</span>
+            <span className="text-xs text-gray-500 capitalize">({user.role})</span>
           </div>
           <button
             onClick={handleLogout}
@@ -262,7 +260,7 @@ export default function RoleBasedNav() {
                 </div>
                 <div>
                   <div className="text-sm font-medium">{user.name}</div>
-                  <div className="text-xs text-gray-500">(guest)</div>
+                  <div className="text-xs text-gray-500 capitalize">({user.role})</div>
                 </div>
               </div>
               <button
