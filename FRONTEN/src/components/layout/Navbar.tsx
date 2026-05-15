@@ -9,7 +9,6 @@ import {
   CalendarDays,
   User,
   LogOut,
-  Compass,
   MessageCircle,
   ChevronDown,
   DollarSign,

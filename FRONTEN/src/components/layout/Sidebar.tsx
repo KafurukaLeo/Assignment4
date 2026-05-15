@@ -72,7 +72,6 @@ export default function Sidebar({
 }: SidebarProps) {
   const location = useLocation();
   const { user } = useAuthStore();
-  const title = user?.role === "admin" ? "Admin" : "Dashboard";
 
   return (
     <>

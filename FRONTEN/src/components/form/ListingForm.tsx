@@ -21,7 +21,7 @@ import {
   Check,
   AlertCircle,
 } from "lucide-react";
-import { api, apiFormData } from "../../lib/api";
+import { apiFormData } from "../../lib/api";
 import { getImageUrl } from "../../lib/utils";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Listing } from "../../types";

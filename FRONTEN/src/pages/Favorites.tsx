@@ -4,7 +4,6 @@ import { api } from "../lib/api";
 import { useAuthStore } from "../store/auth.store";
 import { Heart, MapPin, Star, Users } from "lucide-react";
 import { toast } from "sonner";
-import type { Listing } from "../types";
 
 export default function Favorites() {
   const { user } = useAuthStore();
