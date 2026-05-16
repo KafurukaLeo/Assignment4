@@ -95,7 +95,7 @@ export const register = async (req: Request, res: Response) => {
     });
 
     // Send welcome + verification emails after responding (non-blocking)
-    const verifyLink = `${process.env["API_URL"] ?? "http://localhost:3000"}/api/v1/auth/verify-email/${rawVerifToken}`;
+    const verifyLink = `${process.env["API_URL"] ?? "http://localhost:3001"}/api/v1/auth/verify-email/${rawVerifToken}`;
     try {
       await sendEmail({ to: user.email, subject: "Verify your Airbnb email", html: emailVerificationEmail(user.name, verifyLink) });
       await sendEmail({ to: user.email, subject: "Welcome to Airbnb", html: welcomeEmail(user.name, user.role) });
@@ -125,10 +125,17 @@ export const login = async (req: Request, res: Response) => {
     return res.status(400).json({ error: "Email and password are required" });
   }
 
-  const normalizedEmail = email.toLowerCase().trim();
+  const identifier = email.toLowerCase().trim();
 
   try {
-    const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: identifier },
+          { username: identifier }
+        ]
+      }
+    });
     if (!user) {
       // Use same error message as wrong password to prevent user enumeration
       return res.status(401).json({ error: "Invalid credentials" });
@@ -341,7 +348,7 @@ export const forgotPassword = async (req: Request, res: Response) => {
     });
 
     // Send the raw token in the link — it will be hashed again on reset to verify
-    const resetLink = `${process.env["API_URL"] ?? "http://localhost:5000"}/api/v1/auth/reset-password/${rawToken}`;
+    const resetLink = `${process.env["API_URL"] ?? "http://localhost:3001"}/api/v1/auth/reset-password/${rawToken}`;
 
     await sendEmail({
       to: user.email,
@@ -464,7 +471,7 @@ export const resendVerification = async (req: Request, res: Response) => {
       data: { emailVerificationToken: rawVerifToken },
     });
 
-    const verifyLink = `${process.env["API_URL"] ?? "http://localhost:3000"}/api/v1/auth/verify-email/${rawVerifToken}`;
+    const verifyLink = `${process.env["API_URL"] ?? "http://localhost:3001"}/api/v1/auth/verify-email/${rawVerifToken}`;
     await sendEmail({
       to: user.email,
       subject: "Verify your Airbnb email",

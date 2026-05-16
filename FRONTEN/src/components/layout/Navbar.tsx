@@ -89,7 +89,7 @@ export default function Navbar() {
       return res.data as { notifications: any[], unreadCount: number };
     },
     enabled: !!user,
-    refetchInterval: 5000
+    refetchInterval: 30000 // Poll every 30 seconds instead of 5 to reduce network load
   });
 
   const unreadCount = notificationsData?.unreadCount || 0;
@@ -645,13 +645,13 @@ function ProfileMenu({
             <DropItem to="/become-a-host" close={close} icon={ShieldCheck} label="Become a Host" />
           )}
           <DropItem
-            to="/bookings"
+            to="/dashboard/bookings"
             close={close}
             icon={CalendarDays}
             label="My bookings"
           />
           <DropItem
-            to="/messages"
+            to="/dashboard/messages"
             close={close}
             icon={MessageCircle}
             label="Messages"
@@ -757,14 +757,14 @@ function MobileMenu({
           />
         )}
         <MobileItem
-          to="/bookings"
+          to="/dashboard/bookings"
           close={close}
           icon={CalendarDays}
           label="Bookings"
           desc="Your reservations"
         />
         <MobileItem
-          to="/messages"
+          to="/dashboard/messages"
           close={close}
           icon={MessageCircle}
           label="Messages"

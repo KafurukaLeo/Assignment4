@@ -124,7 +124,7 @@ export default function Messages() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-80px)] bg-white dark:bg-[#0F0F0F] overflow-hidden">
+    <div className="flex h-[calc(100vh-140px)] dark:bg-[#0F0F0F] overflow-hidden rounded-2xl border border-[#EBEBEB] dark:border-[#2A2A2A] bg-white">
       {/* Sidebar - Conversations List */}
       <div className={`w-full md:w-[380px] flex-shrink-0 border-r border-[#EBEBEB] dark:border-[#2A2A2A] flex flex-col ${selectedParticipant ? 'hidden md:flex' : 'flex'}`}>
         <div className="p-6 border-b border-[#EBEBEB] dark:border-[#2A2A2A]">

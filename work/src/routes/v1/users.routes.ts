@@ -131,6 +131,10 @@ router.get("/hosts", authenticate, requireAdmin, getHosts);
  */
 router.post("/become-host", authenticate, applyToBecomeHost);
 
+router.get("/favorites", authenticate, getFavorites);
+router.post("/favorites/:listingId", authenticate, addFavorite);
+router.delete("/favorites/:listingId", authenticate, removeFavorite);
+
 /**
  * GET /users/:id
  * Returns a single user by their ID.
@@ -261,9 +265,6 @@ router.patch("/:id/ban", authenticate, requireAdmin, toggleUserBan);
 
 router.patch("/hosts/:id/status", authenticate, requireAdmin, updateHostStatus);
 
-router.get("/favorites", authenticate, getFavorites);
-router.post("/favorites/:listingId", authenticate, addFavorite);
-router.delete("/favorites/:listingId", authenticate, removeFavorite);
 
 export default router;
 

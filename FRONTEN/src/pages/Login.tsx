@@ -18,23 +18,28 @@ export default function Login() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoading) return;
     setIsLoading(true);
 
     try {
       const data = await login(email, password);
+      setIsLoading(false);
       toast.success("Login successful");
 
       const { user } = data;
 
-      if (redirect) {
-        navigate(redirect);
-      } else if (user.role === "admin") {
-        navigate("/admin");
-      } else if (user.role === "host") {
-        navigate("/dashboard");
-      } else {
-        navigate("/");
-      }
+      // Small timeout to allow the auth store to synchronize before navigation
+      setTimeout(() => {
+        if (redirect) {
+          navigate(redirect);
+        } else if (user.role === "admin") {
+          navigate("/admin");
+        } else if (user.role === "host") {
+          navigate("/dashboard");
+        } else {
+          navigate("/");
+        }
+      }, 100);
     } catch (error: unknown) {
       const message = axios.isAxiosError<{ message?: string; error?: string }>(error)
         ? error.response?.data?.message || error.response?.data?.error

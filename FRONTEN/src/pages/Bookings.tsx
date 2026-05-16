@@ -15,6 +15,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { useAuthStore } from "../store/auth.store";
+import CancellationReasonModal from "../components/CancellationReasonModal";
 
 interface Booking {
   id: string;
@@ -76,6 +77,7 @@ export default function Bookings() {
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<Tab>("upcoming");
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
 
   const { data: bookings, isLoading } = useQuery({
     queryKey: ["guest-bookings", activeTab],
@@ -87,12 +89,13 @@ export default function Bookings() {
   });
 
   const cancelMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const res = await api.delete(`/bookings/${id}`);
+    mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
+      const res = await api.delete(`/bookings/${id}`, { data: { reason } });
       return res.data;
     },
     onSuccess: () => {
       toast.success("Booking cancelled");
+      setCancellingId(null);
       queryClient.invalidateQueries({ queryKey: ["guest-bookings"] });
     },
     onError: () => toast.error("Failed to cancel booking"),
@@ -105,8 +108,12 @@ export default function Bookings() {
   );
 
   const handleCancel = (id: string) => {
-    if (window.confirm("Cancel this reservation?")) {
-      cancelMutation.mutate(id);
+    setCancellingId(id);
+  };
+
+  const confirmCancel = (reason: string) => {
+    if (cancellingId) {
+      cancelMutation.mutate({ id: cancellingId, reason });
     }
   };
 
@@ -171,6 +178,14 @@ export default function Bookings() {
             ))}
           </div>
         )}
+
+        <CancellationReasonModal
+          isOpen={!!cancellingId}
+          onClose={() => setCancellingId(null)}
+          onConfirm={confirmCancel}
+          title="Cancel Reservation"
+          isPending={cancelMutation.isPending}
+        />
       </div>
     </div>
   );

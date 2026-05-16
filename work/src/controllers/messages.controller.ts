@@ -89,35 +89,31 @@ export async function sendMessage(req: AuthRequest, res: Response) {
     const senderId = req.userId!;
     const { receiverId, content, listingId } = req.body;
 
+    console.log(`[Message] Attempting to send from ${senderId} to ${receiverId}. Content: ${content.substring(0, 20)}...`);
+
     if (!receiverId || !content) {
+      console.log("[Message] Missing receiverId or content");
       return res.status(400).json({ error: "Receiver ID and content are required" });
     }
 
-    // Fetch sender and receiver roles to enforce Guest <-> Host communication
+    // Fetch sender and receiver roles
     const [sender, receiver] = await Promise.all([
-      prisma.user.findUnique({ where: { id: senderId }, select: { role: true } }),
-      prisma.user.findUnique({ where: { id: receiverId }, select: { role: true } })
+      prisma.user.findUnique({ where: { id: senderId }, select: { name: true, role: true } }),
+      prisma.user.findUnique({ where: { id: receiverId }, select: { name: true, role: true } })
     ]);
 
     if (!sender || !receiver) {
+      console.log(`[Message] Sender or receiver not found. Sender: ${!!sender}, Receiver: ${!!receiver}`);
       return res.status(404).json({ error: "Sender or receiver not found" });
     }
 
-    // Role-based restriction: Guest <-> Host, or anyone <-> Admin
-    const isAdminInvolved = sender.role === "admin" || receiver.role === "admin";
-    const isGuestHostInteraction = (sender.role === "guest" && receiver.role === "host") || 
-                                    (sender.role === "host" && receiver.role === "guest");
-
-    if (!isAdminInvolved && !isGuestHostInteraction) {
-      return res.status(403).json({ error: "Messaging is only allowed between guests and hosts." });
-    }
-
+    console.log(`[Message] Creating record in database...`);
     const message = await prisma.message.create({
       data: {
         content,
         senderId,
         receiverId,
-        listingId
+        listingId: listingId || null
       },
       include: {
         sender: { select: { id: true, name: true, avatar: true } },
@@ -125,18 +121,21 @@ export async function sendMessage(req: AuthRequest, res: Response) {
       }
     });
 
+    console.log(`[Message] Record created with ID: ${message.id}. Sending notification...`);
+
     // Create notification for receiver
     await createNotification(
       receiverId,
       "New Message",
       `You have a new message from ${message.sender.name}`,
       "message",
-      "/messages"
+      "/dashboard/messages"
     );
 
+    console.log(`[Message] Success!`);
     res.status(201).json(message);
   } catch (error) {
-    console.error(error);
+    console.error("[Message] Error in sendMessage:", error);
     res.status(500).json({ error: "Error sending message" });
   }
 }

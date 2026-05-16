@@ -33,12 +33,23 @@ export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   loading: true,
   fetchUser: async () => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      set({ user: null, loading: false });
+      return;
+    }
+
     set({ loading: true });
     try {
       const res = await api.get("/auth/me");
       // res.data is the user object directly from our backend
       set({ user: res.data, loading: false });
-    } catch {
+    } catch (error: any) {
+      // If it's a network error (server down), don't clear the token
+      if (error.message === "Network Error" || !error.response) {
+        set({ loading: false });
+        return;
+      }
       localStorage.removeItem("token");
       set({ user: null, loading: false });
     }

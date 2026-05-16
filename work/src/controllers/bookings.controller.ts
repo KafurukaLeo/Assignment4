@@ -58,7 +58,16 @@ export const getAllBookings = async (req: AuthRequest, res: Response) => {
         take: limit,
         include: {
           guest: { select: { id: true, name: true, email: true } },
-          listing: { select: { id: true, title: true, location: true, photos: true, pricePerNight: true } },
+          listing: { 
+            select: { 
+              id: true, 
+              title: true, 
+              location: true, 
+              photos: true, 
+              pricePerNight: true,
+              host: { select: { id: true, name: true, email: true } }
+            } 
+          },
         },
         orderBy: { createdAt: "desc" },
       }),
@@ -281,6 +290,7 @@ export const createBooking = async (req: AuthRequest, res: Response) => {
  */
 export const deleteBooking = async (req: AuthRequest, res: Response) => {
   const id = req.params["id"] as string;
+  const { reason } = req.body as { reason?: string };
 
   try {
     const booking = await prisma.booking.findUnique({
@@ -290,9 +300,9 @@ export const deleteBooking = async (req: AuthRequest, res: Response) => {
 
     if (!booking) return res.status(404).json({ error: "Booking not found" });
 
-    // Only the booking owner or an admin can cancel
-    if (booking.guestId !== req.userId && req.role !== "admin") {
-      return res.status(403).json({ error: "You can only cancel your own bookings" });
+    // Permission Check: ONLY the host or an admin can cancel a booking
+    if (booking.listing.hostId !== req.userId && req.role !== "admin") {
+      return res.status(403).json({ error: "Only the host can cancel this booking" });
     }
 
     if (booking.status === "cancelled") {
@@ -300,9 +310,9 @@ export const deleteBooking = async (req: AuthRequest, res: Response) => {
     }
 
     // Soft delete — update status to "cancelled" instead of deleting the record
-    const updated = await prisma.booking.update({
+    const updated = await (prisma.booking as any).update({
       where: { id },
-      data: { status: "cancelled" },
+      data: { status: "cancelled", cancellationReason: reason || null },
     });
 
     // Notify the other party
@@ -318,7 +328,10 @@ export const deleteBooking = async (req: AuthRequest, res: Response) => {
       isGuestCancelling ? "/dashboard/bookings" : "/bookings"
     );
 
-    res.json({ message: "Booking cancelled successfully", data: updated });
+    res.json({ 
+      message: "Booking cancelled successfully", 
+      data: { ...updated, listing: formatListing(booking.listing) } 
+    });
 
     // Send cancellation email after responding — failure here doesn't affect the cancellation
     try {
@@ -332,6 +345,7 @@ export const deleteBooking = async (req: AuthRequest, res: Response) => {
             booking.listing.title,
             booking.checkIn.toDateString(),
             booking.checkOut.toDateString(),
+            reason
           ),
         });
       }
@@ -353,7 +367,7 @@ export const deleteBooking = async (req: AuthRequest, res: Response) => {
  */
 export const updateBookingStatus = async (req: AuthRequest, res: Response) => {
   const id = req.params["id"] as string;
-  const { status } = req.body as { status?: string };
+  const { status, reason } = req.body as { status?: string; reason?: string };
 
   if (!status) return res.status(400).json({ error: "Status is required" });
 
@@ -370,14 +384,17 @@ export const updateBookingStatus = async (req: AuthRequest, res: Response) => {
     
     if (!booking) return res.status(404).json({ error: "Booking not found" });
 
-    // Only the host who owns the listing or an admin can update the status
+    // Permission Check: ONLY the host or an admin can update status or cancel
     if (booking.listing.hostId !== req.userId && req.role !== "admin") {
       return res.status(403).json({ error: "Only the host can update the booking status" });
     }
 
-    const updated = await prisma.booking.update({
+    const updated = await (prisma.booking as any).update({
       where: { id },
-      data: { status: status as "pending" | "confirmed" | "cancelled" },
+      data: { 
+        status: status as "pending" | "confirmed" | "cancelled",
+        cancellationReason: status === "cancelled" ? (reason || null) : null
+      },
       include: { guest: true, listing: true },
     });
 
@@ -415,7 +432,13 @@ export const acceptBooking = async (req: AuthRequest, res: Response) => {
     // FR-034: Auto-expiry after 24 hours
     const hoursSinceCreation = (Date.now() - booking.createdAt.getTime()) / (1000 * 60 * 60);
     if (hoursSinceCreation > 24) {
-      await prisma.booking.update({ where: { id }, data: { status: "cancelled" } });
+      await (prisma.booking as any).update({ 
+        where: { id }, 
+        data: { 
+          status: "cancelled",
+          cancellationReason: "Booking request expired (older than 24 hours)"
+        } 
+      });
       return res.status(400).json({ error: "Booking request has expired (older than 24 hours) and is now cancelled" });
     }
 
@@ -431,7 +454,7 @@ export const acceptBooking = async (req: AuthRequest, res: Response) => {
       "Booking Accepted",
       `Your booking for ${booking.listing.title} has been accepted by the host!`,
       "booking",
-      "/bookings"
+      "/dashboard/bookings"
     );
 
     // Notify guest (best-effort)
@@ -461,6 +484,7 @@ export const acceptBooking = async (req: AuthRequest, res: Response) => {
  */
 export const declineBooking = async (req: AuthRequest, res: Response) => {
   const id = req.params["id"] as string;
+  const { reason } = req.body as { reason?: string };
 
   try {
     const booking = await prisma.booking.findUnique({
@@ -478,9 +502,9 @@ export const declineBooking = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: "Only pending bookings can be declined" });
     }
 
-    const updated = await prisma.booking.update({
+    const updated = await (prisma.booking as any).update({
       where: { id },
-      data: { status: "cancelled" }, // Map declined to cancelled for simplicity
+      data: { status: "cancelled", cancellationReason: reason || null }, // Map declined to cancelled for simplicity
       include: { guest: true, listing: true },
     });
 
@@ -490,7 +514,7 @@ export const declineBooking = async (req: AuthRequest, res: Response) => {
       "Booking Declined",
       `Your booking request for ${booking.listing.title} was declined.`,
       "booking",
-      "/bookings"
+      "/dashboard/bookings"
     );
 
     // Notify guest (best-effort)
@@ -501,7 +525,8 @@ export const declineBooking = async (req: AuthRequest, res: Response) => {
         booking.guest.name,
         booking.listing.title,
         booking.checkIn.toDateString(),
-        booking.checkOut.toDateString()
+        booking.checkOut.toDateString(),
+        reason
       ),
     }).catch(console.error);
 

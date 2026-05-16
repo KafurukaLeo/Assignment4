@@ -14,6 +14,8 @@ import {
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
 import { toast } from "sonner";
+import { useAuthStore } from "../../store/auth.store";
+import CancellationReasonModal from "../../components/CancellationReasonModal";
 
 const statusConfig: Record<string, { label: string; class: string }> = {
   confirmed: {
@@ -42,6 +44,10 @@ interface Booking {
     title: string;
     location: string;
     photos: string[];
+    host?: {
+      name: string;
+      email: string;
+    };
   };
   checkIn: string;
   checkOut: string;
@@ -53,11 +59,14 @@ export default function DashboardBooking() {
   const [searchText, setSearchText] = useState("");
   const [filterOpen, setFilterOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
+  const [cancellingStatus, setCancellingStatus] = useState<{ id: string; status: string } | null>(null);
 
+  const { user } = useAuthStore();
+  const isGuest = user?.role === "guest";
   const { data: response, isLoading } = useQuery({
-    queryKey: ["host-bookings"],
+    queryKey: ["dashboard-bookings", isGuest ? "guest" : "host"],
     queryFn: async () => {
-      const response = await api.get("/bookings?mode=host");
+      const response = await api.get(`/bookings?mode=${isGuest ? "guest" : "host"}`);
       return response.data;
     },
   });
@@ -66,12 +75,13 @@ export default function DashboardBooking() {
   const queryClient = useQueryClient();
 
   const updateBookingMutation = useMutation({
-    mutationFn: async ({ bookingId, status }: { bookingId: string; status: string }) => {
-      const response = await api.patch(`/bookings/${bookingId}/status`, { status });
+    mutationFn: async ({ bookingId, status, reason }: { bookingId: string; status: string; reason?: string }) => {
+      const response = await api.patch(`/bookings/${bookingId}/status`, { status, reason });
       return response.data;
     },
     onSuccess: () => {
       toast.success("Booking status updated successfully");
+      setCancellingStatus(null);
       queryClient.invalidateQueries({ queryKey: ["host-bookings"] });
     },
     onError: () => {
@@ -80,7 +90,21 @@ export default function DashboardBooking() {
   });
 
   const handleUpdateStatus = (bookingId: string, status: string) => {
-    updateBookingMutation.mutate({ bookingId, status });
+    if (status === "cancelled") {
+      setCancellingStatus({ id: bookingId, status });
+    } else {
+      updateBookingMutation.mutate({ bookingId, status });
+    }
+  };
+
+  const confirmCancel = (reason: string) => {
+    if (cancellingStatus) {
+      updateBookingMutation.mutate({ 
+        bookingId: cancellingStatus.id, 
+        status: cancellingStatus.status, 
+        reason 
+      });
+    }
   };
 
   const filterOptions = [
@@ -192,14 +216,18 @@ export default function DashboardBooking() {
         <table className="w-full text-sm text-left">
           <thead>
             <tr className="border-b border-[#EBEBEB] dark:border-[#2A2A2A]">
-              {bookingHeader.map((header: string) => (
-                <th
-                  key={header}
-                  className="px-4 py-3 text-[12px] font-semibold text-[#AAAAAA] uppercase tracking-wide whitespace-nowrap"
-                >
-                  {header}
-                </th>
-              ))}
+              {bookingHeader.map((header: string) => {
+                let displayHeader = header;
+                if (isGuest && header === "Guest") displayHeader = "Host";
+                return (
+                  <th
+                    key={header}
+                    className="px-4 py-3 text-[12px] font-semibold text-[#AAAAAA] uppercase tracking-wide whitespace-nowrap"
+                  >
+                    {displayHeader}
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>
@@ -229,15 +257,18 @@ export default function DashboardBooking() {
                     <div className="flex items-center gap-2">
                       <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
                         <span className="text-xs font-medium">
-                          {booking.guest?.name?.charAt(0).toUpperCase()}
+                          {isGuest 
+                            ? (booking.listing?.host?.name?.charAt(0).toUpperCase() || "?")
+                            : (booking.guest?.name?.charAt(0).toUpperCase() || "?")
+                          }
                         </span>
                       </div>
                       <div>
                         <p className="font-medium text-sm">
-                          {booking.guest?.name}
+                          {isGuest ? booking.listing?.host?.name : booking.guest?.name}
                         </p>
                         <p className="text-xs text-[#AAAAAA]">
-                          {booking.guest?.email}
+                          {isGuest ? booking.listing?.host?.email : booking.guest?.email}
                         </p>
                       </div>
                     </div>
@@ -264,59 +295,56 @@ export default function DashboardBooking() {
                     </div>
                   </td>
                   <td className="py-3 px-4">
-                    <div>
-                      <p className="text-sm">
-                        {new Date(booking.checkIn).toLocaleDateString()}
-                      </p>
-                      <p className="text-xs text-[#AAAAAA]">
-                        to {new Date(booking.checkOut).toLocaleDateString()}
-                      </p>
-                    </div>
+                    <p className="text-sm">
+                      {new Date(booking.checkIn).toLocaleDateString()}
+                    </p>
                   </td>
                   <td className="py-3 px-4">
-                    <div className="flex items-center gap-2">
-                      {booking.status === "pending" && (
-                        <>
-                          <button
-                            onClick={() => handleUpdateStatus(booking.id, "confirmed")}
-                            className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-md transition-colors"
-                            disabled={updateBookingMutation.isPending}
-                          >
-                            <Check className="w-3 h-3" />
-                            Confirm
-                          </button>
-                          <button
-                            onClick={() => handleUpdateStatus(booking.id, "cancelled")}
-                            className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-md transition-colors"
-                            disabled={updateBookingMutation.isPending}
-                          >
-                            <X className="w-3 h-3" />
-                            Cancel
-                          </button>
-                        </>
-                      )}
-                      {booking.status === "confirmed" && (
-                        <button
-                          onClick={() => handleUpdateStatus(booking.id, "cancelled")}
-                          className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-md transition-colors"
-                          disabled={updateBookingMutation.isPending}
-                        >
-                          <X className="w-3 h-3" />
-                          Cancel
-                        </button>
-                      )}
-                      {booking.status === "cancelled" && (
-                        <span className="text-xs text-gray-500">No actions</span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="py-3 px-4">
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusConfig[booking.status]?.class || "bg-gray-100 text-gray-700"}`}>
-                      {statusConfig[booking.status]?.label || booking.status}
-                    </span>
+                    <p className="text-sm">
+                      {new Date(booking.checkOut).toLocaleDateString()}
+                    </p>
                   </td>
                   <td className="py-3 px-4">
                     <p className="font-medium text-sm">${booking.totalPrice}</p>
+                  </td>
+                  <td className="py-3 px-4">
+                    <div className="flex flex-col gap-2">
+                      <span className={`px-2 py-1 text-[10px] font-medium rounded-full w-fit ${statusConfig[booking.status]?.class || "bg-gray-100 text-gray-700"}`}>
+                        {statusConfig[booking.status]?.label || booking.status}
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        {!isGuest && booking.status === "pending" && (
+                          <>
+                            <button
+                              onClick={() => handleUpdateStatus(booking.id, "confirmed")}
+                              className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                              title="Confirm"
+                              disabled={updateBookingMutation.isPending}
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleUpdateStatus(booking.id, "cancelled")}
+                              className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Cancel"
+                              disabled={updateBookingMutation.isPending}
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </>
+                        )}
+                        {!isGuest && booking.status === "confirmed" && (
+                          <button
+                            onClick={() => handleUpdateStatus(booking.id, "cancelled")}
+                            className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Cancel"
+                            disabled={updateBookingMutation.isPending}
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </td>
                 </tr>
               ))
@@ -366,12 +394,19 @@ export default function DashboardBooking() {
                   <div className="flex items-center gap-2">
                     <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
                       <span className="text-xs font-medium">
-                        {booking.guest?.name?.charAt(0).toUpperCase()}
+                        {isGuest 
+                          ? (booking.listing?.host?.name?.charAt(0).toUpperCase() || "?")
+                          : (booking.guest?.name?.charAt(0).toUpperCase() || "?")
+                        }
                       </span>
                     </div>
                     <div>
-                      <p className="font-medium text-sm">{booking.guest?.name}</p>
-                      <p className="text-xs text-[#AAAAAA]">{booking.guest?.email}</p>
+                      <p className="font-medium text-sm">
+                        {isGuest ? booking.listing?.host?.name : booking.guest?.name}
+                      </p>
+                      <p className="text-xs text-[#AAAAAA]">
+                        {isGuest ? booking.listing?.host?.email : booking.guest?.email}
+                      </p>
                     </div>
                   </div>
                   <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusConfig[booking.status]?.class || "bg-gray-100 text-gray-700"}`}>
@@ -391,7 +426,7 @@ export default function DashboardBooking() {
                     <p className="font-medium text-sm">${booking.totalPrice}</p>
                   </div>
                   <div className="flex items-center gap-2 pt-2">
-                    {booking.status === "pending" && (
+                    {!isGuest && booking.status === "pending" && (
                       <>
                         <button
                           onClick={() => handleUpdateStatus(booking.id, "confirmed")}
@@ -411,7 +446,7 @@ export default function DashboardBooking() {
                         </button>
                       </>
                     )}
-                    {booking.status === "confirmed" && (
+                    {!isGuest && booking.status === "confirmed" && (
                       <button
                         onClick={() => handleUpdateStatus(booking.id, "cancelled")}
                         className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-md transition-colors"
@@ -420,9 +455,6 @@ export default function DashboardBooking() {
                         <X className="w-3 h-3" />
                         Cancel
                       </button>
-                    )}
-                    {booking.status === "cancelled" && (
-                      <span className="text-xs text-gray-500">No actions</span>
                     )}
                   </div>
                 </div>
@@ -463,6 +495,14 @@ export default function DashboardBooking() {
           </button>
         </div>
       </div>
+
+      <CancellationReasonModal
+        isOpen={!!cancellingStatus}
+        onClose={() => setCancellingStatus(null)}
+        onConfirm={confirmCancel}
+        title="Cancel or Decline Booking"
+        isPending={updateBookingMutation.isPending}
+      />
     </div>
   );
 }

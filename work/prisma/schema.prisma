@@ -109,6 +109,7 @@ model booking {
   guestId    String
   listing    listing       @relation(fields: [listingId], references: [id])
   listingId  String
+  cancellationReason String?
 
   @@index([guestId])
   @@index([listingId])

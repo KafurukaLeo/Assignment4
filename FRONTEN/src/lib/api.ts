@@ -30,6 +30,10 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
+    // Silently handle 401 for /auth/me (initial auth check)
+    if (error.response?.status === 401 && error.config?.url === "/auth/me") {
+      return Promise.reject(error);
+    }
     console.error("Request failed:", error.config?.url, error.message);
     return Promise.reject(error);
   },
@@ -62,6 +66,10 @@ apiFormData.interceptors.response.use(
     return response;
   },
   (error) => {
+    // Silently handle 401 for /auth/me (initial auth check)
+    if (error.response?.status === 401 && error.config?.url === "/auth/me") {
+      return Promise.reject(error);
+    }
     console.error("Request failed:", error.config?.url, error.message);
     return Promise.reject(error);
   }

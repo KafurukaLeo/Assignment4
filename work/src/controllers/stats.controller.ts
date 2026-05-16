@@ -56,8 +56,11 @@ export const getDashboardStats = async (req: any, res: Response) => {
       const [totalUsers, totalListings, totalBookings, totalRevenue] = await Promise.all([
         prisma.user.count(),
         prisma.listing.count(),
-        prisma.booking.count(),
-        prisma.booking.aggregate({ _sum: { totalPrice: true } }),
+        prisma.booking.count({ where: { status: "confirmed" } }),
+        prisma.booking.aggregate({ 
+          where: { status: "confirmed" },
+          _sum: { totalPrice: true } 
+        }),
       ]);
 
       const recentBookings = await prisma.booking.findMany({
@@ -68,8 +71,25 @@ export const getDashboardStats = async (req: any, res: Response) => {
 
       const topListings = await prisma.listing.findMany({
         take: 5,
-        orderBy: { bookings: { _count: "desc" } },
-        include: { _count: { select: { bookings: true } } },
+        orderBy: { 
+          bookings: { 
+            _count: "desc" 
+          } 
+        },
+        where: {
+          bookings: {
+            some: { status: "confirmed" }
+          }
+        },
+        include: { 
+          _count: { 
+            select: { 
+              bookings: {
+                where: { status: "confirmed" }
+              } 
+            } 
+          } 
+        },
       });
 
       return res.json({
@@ -116,10 +136,27 @@ export const getDashboardStats = async (req: any, res: Response) => {
       });
 
       const topListings = await prisma.listing.findMany({
-        where: { hostId: userId },
+        where: { 
+          hostId: userId,
+          bookings: {
+            some: { status: "confirmed" }
+          }
+        },
         take: 5,
-        orderBy: { bookings: { _count: "desc" } },
-        include: { _count: { select: { bookings: true } } },
+        orderBy: { 
+          bookings: { 
+            _count: "desc" 
+          } 
+        },
+        include: { 
+          _count: { 
+            select: { 
+              bookings: {
+                where: { status: "confirmed" }
+              } 
+            } 
+          } 
+        },
       });
 
       return res.json({

@@ -98,7 +98,7 @@ export default function App() {
             <Route
               path="/dashboard"
               element={
-                <ProtectedRoute requiredRole="host">
+                <ProtectedRoute>
                   <DashboardLayout />
                 </ProtectedRoute>
               }

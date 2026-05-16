@@ -1,4 +1,4 @@
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { useAuthStore } from "../store/auth.store";
 import Spinner from "../components/Spinner";
 
@@ -12,11 +12,13 @@ export function ProtectedRoute({
   requiredRole,
 }: ProtectedRouteProps) {
   const { user, loading } = useAuthStore();
+  const location = useLocation();
 
   if (loading) return <Spinner />;
 
+  // If no user is found after loading, only then redirect
   if (!user) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
   if (requiredRole && user.role !== requiredRole) {

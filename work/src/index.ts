@@ -11,7 +11,7 @@ import { v1Router } from "./routes/v1/index";
 import { errorHandler } from "./middlewares/errorHandler";
 
 const app = express();
-const PORT = Number(process.env["PORT"]) || 3000;
+const PORT = Number(process.env["PORT"]) || 3001;
 
 // Enable CORS for all origins (useful for local development)
 app.use(
@@ -77,17 +77,21 @@ app.use(errorHandler);
 
 // Main function — connects to DB and Redis before starting the server
 async function main() {
-  await connectDB();
-  await connectRedis();
-  app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-  });
+  try {
+    console.log("Starting server...");
+    await connectDB();
+    await connectRedis();
+    app.listen(PORT, () => {
+      console.log(`Server is running on port ${PORT}`);
+    });
+  } catch (error) {
+    console.error("CRITICAL ERROR DURING STARTUP:", error);
+    process.exit(1);
+  }
 }
 
-// Only start the server if this file is run directly (not imported in tests)
-if (require.main === module) {
-  main();
-}
+// Call main immediately
+main();
 
 export default app;
  

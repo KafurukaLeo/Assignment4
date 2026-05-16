@@ -215,10 +215,28 @@ export async function createListing(req: AuthRequest, res: Response) {
     // Handle photo uploads to Cloudinary
     const files = (req as any).files as Express.Multer.File[];
     const photoUrls: string[] = [];
+    
+    // Check if Cloudinary is configured
+    const isCloudinaryConfigured = process.env["CLOUDINARY_CLOUD_NAME"] && process.env["CLOUDINARY_API_KEY"];
+    
     if (files && files.length > 0) {
-      for (const file of files) {
-        const { url } = await uploadToCloudinary(file.buffer, "airbnb/listings");
-        photoUrls.push(url);
+      if (isCloudinaryConfigured) {
+        for (const file of files) {
+          try {
+            const { url } = await uploadToCloudinary(file.buffer, "airbnb/listings");
+            photoUrls.push(url);
+          } catch (uploadErr) {
+            console.error("Cloudinary upload failed:", uploadErr);
+            // Fallback to placeholder if one upload fails
+            photoUrls.push("https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&q=80");
+          }
+        }
+      } else {
+        console.warn("Cloudinary not configured. Using placeholder images.");
+        // Add one placeholder for each file uploaded so the count remains correct
+        files.forEach(() => {
+          photoUrls.push("https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&q=80");
+        });
       }
     }
 
@@ -228,7 +246,8 @@ export async function createListing(req: AuthRequest, res: Response) {
       try {
         finalAmenities = JSON.parse(amenities);
       } catch (e) {
-        finalAmenities = [];
+        // Fallback: split by comma if it's not valid JSON
+        finalAmenities = amenities.split(",").map((a: string) => a.trim()).filter((a: string) => a !== "");
       }
     }
 
@@ -257,10 +276,13 @@ export async function createListing(req: AuthRequest, res: Response) {
       ...formatListing(listing)
     });
   } catch (error) {
+    const errorDetails = error instanceof Error ? error.stack : String(error);
+    require('fs').appendFileSync('error.log', `[${new Date().toISOString()}] CREATE LISTING ERROR: ${errorDetails}\n`);
     console.error("Error creating listing:", error);
     res.status(500).json({ 
       message: "An internal server error occurred while creating the listing",
-      error: "Error creating listing" 
+      error: "Error creating listing",
+      details: error instanceof Error ? error.message : String(error)
     });
   }
 }

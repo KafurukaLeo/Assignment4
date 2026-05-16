@@ -27,7 +27,7 @@ export const DashboardLinks = [
   { title: "Listing", url: "/dashboard/listings", badge: null, icon: Home },
   {
     title: "Messages",
-    url: "/messages",
+    url: "/dashboard/messages",
     badge: null,
     icon: MessageCircle,
   },
@@ -95,12 +95,12 @@ export const searchPriceRange = [
 ];
 
 export const bookingHeader = [
-  "Check-in",
-  "Check-out",
   "Guest",
   "Listing",
-  "total price",
-  "status",
+  "Check-in",
+  "Check-out",
+  "Total Price",
+  "Status",
 ];
 
 export const listingHeader = [

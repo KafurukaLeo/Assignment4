@@ -1,30 +1,25 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
 async function main() {
   const users = await prisma.user.findMany({
-    where: { 
-      OR: [
-        { role: "admin" },
-        { email: "pending_host@example.com" }
-      ]
-    },
     select: {
       id: true,
+      name: true,
       email: true,
+      username: true,
       role: true,
       status: true,
-      hostStatus: true,
       loginAttempts: true,
-      lockUntil: true,
-    },
+      lockUntil: true
+    }
   });
   console.log(JSON.stringify(users, null, 2));
 }
 
 main()
-  .catch((e) => {
+  .catch(e => {
     console.error(e);
     process.exit(1);
   })

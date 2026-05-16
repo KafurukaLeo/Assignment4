@@ -45,7 +45,12 @@ export function bookingCancellationEmail(
   listingTitle: string,
   checkIn: string,
   checkOut: string,
+  reason?: string,
 ): string {
+  const reasonHtml = reason 
+    ? `<p style="margin-top:16px; padding:12px; background:#f8f8f8; border-left:4px solid #FF5A5F;"><strong>Reason:</strong> ${reason}</p>` 
+    : "";
+
   return `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <h1 style="color: #FF5A5F;">Booking Cancelled</h1>
@@ -55,6 +60,7 @@ export function bookingCancellationEmail(
         <tr><td style="padding:8px; border-bottom:1px solid #eee;"><strong>Check-in</strong></td><td style="padding:8px; border-bottom:1px solid #eee;">${checkIn}</td></tr>
         <tr><td style="padding:8px;"><strong>Check-out</strong></td><td style="padding:8px;">${checkOut}</td></tr>
       </table>
+      ${reasonHtml}
       <p style="margin-top:16px;">Looking for another stay? We have thousands of listings waiting for you.</p>
       <a href="http://localhost:5000" style="display:inline-block; background:#FF5A5F; color:white; padding:12px 24px; text-decoration:none; border-radius:4px; margin-top:8px;">Find a Listing</a>
     </div>
