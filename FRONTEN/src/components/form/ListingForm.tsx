@@ -2,7 +2,6 @@ import { useState, useRef } from "react";
 import {
   X,
   ChevronRight,
-  ChevronLeft,
   Home,
   MapPin,
   DollarSign,
@@ -281,9 +280,6 @@ export default function ListingForm({
     mutation.mutate(form);
   };
 
-  const inputBase =
-    "w-full px-3 py-2.5 bg-[#F7F7F7] dark:bg-[#1a2235] border border-[#EBEBEB] dark:border-[#2A2A2A] rounded-xl text-[13px] text-[#111] dark:text-white placeholder:text-[#AAAAAA] outline-none transition-all focus:border-[#111] dark:focus:border-white focus:ring-2 focus:ring-black/5 dark:focus:ring-white/5";
-  const inputErr = "!border-[#FF385C] focus:!border-[#FF385C]";
 
   return (
     <div className="fixed inset-0 z-100 flex items-center justify-center p-4">
@@ -304,45 +300,45 @@ export default function ListingForm({
           </div>
           <button
             onClick={onClose}
-            className="w-7 h-7 rounded-lg bg-[#F7F7F7] dark:bg-[#1a2235] border border-[#EBEBEB] dark:border-[#2A2A2A] flex items-center justify-center text-[#717171] hover:bg-[#EBEBEB] dark:hover:bg-[#2A2A2A] hover:text-[#111] dark:hover:text-white transition-all"
+            className="w-9 h-9 rounded-full bg-[var(--bg-sub)] flex items-center justify-center text-[var(--text-sub)] hover:bg-[var(--border-main)] hover:text-[var(--text-main)] transition-all"
           >
-            <X size={14} />
+            <X size={16} />
           </button>
         </div>
 
-        <div className="flex items-center px-5 py-3 border-b border-[#EBEBEB] dark:border-[#2A2A2A] overflow-x-auto">
+        <div className="flex items-center px-6 py-4 border-b border-[var(--border-main)] overflow-x-auto custom-scrollbar bg-[var(--bg-sub)]">
           {STEPS.map((s, i) => (
             <div key={s} className="flex items-center shrink-0">
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-2.5">
                 <div
-                  className={`w-5.5 h-5.5 rounded-full border flex items-center justify-center text-[10px] font-bold transition-all
+                  className={`w-7 h-7 rounded-full border-2 flex items-center justify-center text-[11px] font-bold transition-all duration-300
                     ${
                       i <= step
-                        ? "bg-[#111] dark:bg-white border-[#111] dark:border-white text-white dark:text-[#111]"
-                        : "bg-[#F7F7F7] dark:bg-[#1a2235] border-[#EBEBEB] dark:border-[#2A2A2A] text-[#AAAAAA]"
+                        ? "bg-[var(--color-primary)] border-[var(--color-primary)] text-white premium-shadow"
+                        : "bg-white dark:bg-white/5 border-[var(--border-main)] text-[var(--text-sub)]"
                     }`}
                 >
-                  {i < step ? <Check size={10} strokeWidth={3} /> : i + 1}
+                  {i < step ? <Check size={12} strokeWidth={3} /> : i + 1}
                 </div>
                 <span
-                  className={`text-[11px] font-medium transition-colors whitespace-nowrap
-                    ${i === step ? "text-[#111] dark:text-white" : i < step ? "text-[#717171]" : "text-[#AAAAAA]"}`}
+                  className={`text-[12px] font-semibold transition-colors whitespace-nowrap
+                    ${i === step ? "text-[var(--text-main)]" : "text-[var(--text-sub)]"}`}
                 >
                   {s}
                 </span>
               </div>
               {i < STEPS.length - 1 && (
-                <div className="w-5 h-px bg-[#EBEBEB] dark:bg-[#2A2A2A] mx-1.5 shrink-0" />
+                <div className={`w-6 h-0.5 mx-2.5 shrink-0 rounded-full transition-colors duration-500 ${i < step ? "bg-[var(--color-primary)]" : "bg-[var(--border-main)]"}`} />
               )}
             </div>
           ))}
         </div>
 
-        <div className="flex-1 overflow-y-auto px-5 py-6">
+        <div className="flex-1 overflow-y-auto px-6 py-8">
           {mutation.isError && (
-            <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400" />
-              <span className="text-sm text-red-700 dark:text-red-300">
+            <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/50 rounded-2xl flex items-center gap-3 animate-fade-up">
+              <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
+              <span className="text-[13px] font-medium text-red-700 dark:text-red-300">
                 {getMutationMessage(
                   mutation.error,
                   `Failed to ${isEditing ? "update" : "create"} listing`,
@@ -352,37 +348,37 @@ export default function ListingForm({
           )}
 
           {step === 0 && (
-            <div className="flex flex-col gap-5">
+            <div className="flex flex-col gap-6 animate-fade-up">
               <div>
-                <h2 className="text-xl font-semibold text-[#111] dark:text-white">
+                <h2 className="font-heading text-2xl font-bold text-[var(--text-main)]">
                   Tell us about your place
                 </h2>
-                <p className="text-[13px] text-[#717171] mt-1">
+                <p className="text-[14px] text-[var(--text-sub)] mt-1.5">
                   A great title and description help guests find your listing.
                 </p>
               </div>
               <Field label="Listing title" error={errors.title}>
                 <input
-                  className={`${inputBase} ${errors.title ? inputErr : ""}`}
+                  className={`input ${errors.title ? "border-red-500 focus:border-red-500" : ""}`}
                   placeholder="e.g. Cozy downtown apartment with city views"
                   value={form.title}
                   onChange={(e) => update("title", e.target.value)}
                   maxLength={80}
                 />
-                <div className="text-[11px] text-[#AAAAAA] text-right mt-1">
+                <div className="text-[11px] text-[var(--text-sub)] font-medium text-right mt-1.5">
                   {form.title.length}/80
                 </div>
               </Field>
               <Field label="Description" error={errors.description}>
                 <textarea
-                  className={`${inputBase} resize-none min-h-27.5 ${errors.description ? inputErr : ""}`}
+                  className={`input min-h-32 resize-none ${errors.description ? "border-red-500 focus:border-red-500" : ""}`}
                   placeholder="Describe your space, the neighborhood, what makes it special…"
                   value={form.description}
                   onChange={(e) => update("description", e.target.value)}
                   maxLength={500}
                   rows={5}
                 />
-                <div className="text-[11px] text-[#AAAAAA] text-right mt-1">
+                <div className="text-[11px] text-[var(--text-sub)] font-medium text-right mt-1.5">
                   {form.description.length}/500
                 </div>
               </Field>
@@ -390,12 +386,12 @@ export default function ListingForm({
           )}
 
           {step === 1 && (
-            <div className="flex flex-col gap-5">
+            <div className="flex flex-col gap-6 animate-fade-up">
               <div>
-                <h2 className="text-xl font-semibold text-[#111] dark:text-white">
+                <h2 className="font-heading text-2xl font-bold text-[var(--text-main)]">
                   Location & details
                 </h2>
-                <p className="text-[13px] text-[#717171] mt-1">
+                <p className="text-[14px] text-[var(--text-sub)] mt-1.5">
                   Help guests understand where they're staying.
                 </p>
               </div>
@@ -404,52 +400,58 @@ export default function ListingForm({
                 icon={<MapPin size={13} />}
                 error={errors.location}
               >
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#717171] pointer-events-none">
-                  <MapPin size={13} />
-                </span>
-                <input
-                  className={`${inputBase} pl-8 ${errors.location ? inputErr : ""}`}
-                  placeholder="City, neighborhood or full address"
-                  value={form.location}
-                  onChange={(e) => update("location", e.target.value)}
-                />
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-sub)] pointer-events-none">
+                    <MapPin size={15} />
+                  </span>
+                  <input
+                    className={`input pl-11 ${errors.location ? "border-red-500 focus:border-red-500" : ""}`}
+                    placeholder="City, neighborhood or full address"
+                    value={form.location}
+                    onChange={(e) => update("location", e.target.value)}
+                  />
+                </div>
               </Field>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-4">
                 <Field
                   label="Price / night (USD)"
                   icon={<DollarSign size={13} />}
                   error={errors.pricePerNight}
                 >
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#717171] pointer-events-none">
-                    <DollarSign size={13} />
-                  </span>
-                  <input
-                    className={`${inputBase} pl-8 ${errors.pricePerNight ? inputErr : ""}`}
-                    placeholder="0.00"
-                    type="number"
-                    min={0}
-                    step={0.01}
-                    value={form.pricePerNight}
-                    onChange={(e) => update("pricePerNight", e.target.value)}
-                  />
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-sub)] pointer-events-none">
+                      <DollarSign size={15} />
+                    </span>
+                    <input
+                      className={`input pl-11 ${errors.pricePerNight ? "border-red-500 focus:border-red-500" : ""}`}
+                      placeholder="0.00"
+                      type="number"
+                      min={0}
+                      step={0.01}
+                      value={form.pricePerNight}
+                      onChange={(e) => update("pricePerNight", e.target.value)}
+                    />
+                  </div>
                 </Field>
                 <Field
                   label="Max guests"
                   icon={<Users size={13} />}
                   error={errors.guests}
                 >
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#717171] pointer-events-none">
-                    <Users size={13} />
-                  </span>
-                  <input
-                    className={`${inputBase} pl-8 ${errors.guests ? inputErr : ""}`}
-                    placeholder="1"
-                    type="number"
-                    min={1}
-                    max={50}
-                    value={form.guests}
-                    onChange={(e) => update("guests", e.target.value)}
-                  />
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-sub)] pointer-events-none">
+                      <Users size={15} />
+                    </span>
+                    <input
+                      className={`input pl-11 ${errors.guests ? "border-red-500 focus:border-red-500" : ""}`}
+                      placeholder="1"
+                      type="number"
+                      min={1}
+                      max={50}
+                      value={form.guests}
+                      onChange={(e) => update("guests", e.target.value)}
+                    />
+                  </div>
                 </Field>
               </div>
               <Field
@@ -457,23 +459,23 @@ export default function ListingForm({
                 icon={<Layers size={13} />}
                 error={errors.type}
               >
-                <div className="grid grid-cols-2 gap-2 mt-0.5">
+                <div className="grid grid-cols-2 gap-3 mt-1">
                   {LISTING_TYPES.map((t) => (
                     <button
                       key={t.value}
                       type="button"
                       onClick={() => update("type", t.value)}
-                      className={`px-3.5 py-3 border rounded-xl text-left flex flex-col gap-0.5 transition-all
+                      className={`px-4 py-4 border-2 rounded-2xl text-left flex flex-col gap-1 transition-all duration-300
                         ${
                           form.type === t.value
-                            ? "border-[#111] dark:border-white bg-white dark:bg-[#1a2235]"
-                            : "border-[#EBEBEB] dark:border-[#2A2A2A] bg-[#F7F7F7] dark:bg-[#1a2235] hover:border-[#AAAAAA] dark:hover:border-[#555]"
+                            ? "border-[var(--color-primary)] bg-[var(--color-primary)]/5 ring-4 ring-[var(--color-primary)]/5"
+                            : "border-[var(--border-main)] bg-[var(--bg-main)] hover:border-[var(--text-sub)]/50"
                         }`}
                     >
-                      <span className="text-[13px] font-semibold text-[#111] dark:text-white">
+                      <span className={`text-[14px] font-bold ${form.type === t.value ? "text-[var(--color-primary)]" : "text-[var(--text-main)]"}`}>
                         {t.label}
                       </span>
-                      <span className="text-[11px] text-[#717171]">
+                      <span className="text-[12px] text-[var(--text-sub)] font-medium">
                         {t.desc}
                       </span>
                     </button>
@@ -484,63 +486,57 @@ export default function ListingForm({
           )}
 
           {step === 2 && (
-            <div className="flex flex-col gap-5">
+            <div className="flex flex-col gap-6 animate-fade-up">
               <div>
-                <h2 className="text-xl font-semibold text-[#111] dark:text-white">
+                <h2 className="font-heading text-2xl font-bold text-[var(--text-main)]">
                   Amenities
                 </h2>
-                <p className="text-[13px] text-[#717171] mt-1">
+                <p className="text-[14px] text-[var(--text-sub)] mt-1.5">
                   What does your place offer? Select everything that applies.
                 </p>
               </div>
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-3 gap-3">
                 {AMENITIES.map(({ key, label, icon: Icon }) => (
                   <button
                     key={key}
                     type="button"
                     onClick={() => toggleAmenity(key)}
-                    className={`relative px-2 py-3 border rounded-xl flex flex-col items-center gap-1.5 text-[11px] font-medium transition-all
+                    className={`relative px-3 py-4 border-2 rounded-2xl flex flex-col items-center gap-2.5 transition-all duration-300
                       ${
                         form.amenities.includes(key)
-                          ? "border-[#111] dark:border-white bg-white dark:bg-[#1a2235] text-[#111] dark:text-white"
-                          : "border-[#EBEBEB] dark:border-[#2A2A2A] bg-[#F7F7F7] dark:bg-[#1a2235] text-[#717171] hover:border-[#AAAAAA] dark:hover:border-[#555] hover:text-[#111] dark:hover:text-white"
+                          ? "border-[var(--color-primary)] bg-[var(--color-primary)]/5 text-[var(--color-primary)] ring-4 ring-[var(--color-primary)]/5"
+                          : "border-[var(--border-main)] bg-[var(--bg-main)] text-[var(--text-sub)] hover:border-[var(--text-sub)]/50"
                       }`}
                   >
-                    <Icon size={18} strokeWidth={1.5} />
-                    <span className="text-center leading-tight">{label}</span>
+                    <Icon size={20} strokeWidth={form.amenities.includes(key) ? 2.5 : 2} />
+                    <span className="text-[12px] font-bold text-center leading-tight">{label}</span>
                     {form.amenities.includes(key) && (
-                      <span className="absolute top-1 right-1 w-3.5 h-3.5 rounded-full bg-[#111] dark:bg-white flex items-center justify-center text-white dark:text-[#111]">
-                        <Check size={8} strokeWidth={3} />
+                      <span className="absolute top-2 right-2 w-5 h-5 rounded-full bg-[var(--color-primary)] flex items-center justify-center text-white premium-shadow">
+                        <Check size={10} strokeWidth={4} />
                       </span>
                     )}
                   </button>
                 ))}
               </div>
-              {form.amenities.length > 0 && (
-                <p className="text-[12px] text-[#717171]">
-                  {form.amenities.length} amenit
-                  {form.amenities.length === 1 ? "y" : "ies"} selected
-                </p>
-              )}
             </div>
           )}
 
           {step === 3 && (
-            <div className="flex flex-col gap-5">
+            <div className="flex flex-col gap-6 animate-fade-up">
               <div>
-                <h2 className="text-xl font-semibold text-[#111] dark:text-white">
+                <h2 className="font-heading text-2xl font-bold text-[var(--text-main)]">
                   Photos
                 </h2>
-                <p className="text-[13px] text-[#717171] mt-1">
+                <p className="text-[14px] text-[var(--text-sub)] mt-1.5">
                   Add up to 10 photos. The first photo will be the cover.
                 </p>
               </div>
               <div
-                className={`border border-dashed rounded-2xl px-5 py-8 flex flex-col items-center gap-2 cursor-pointer transition-all
+                className={`border-3 border-dashed rounded-[2rem] px-8 py-12 flex flex-col items-center gap-3 cursor-pointer transition-all duration-300
                   ${
                     form.photos.length === 0 && errors.photos
-                      ? "border-red-400 bg-red-50/50 dark:bg-red-900/10"
-                      : "border-[#EBEBEB] dark:border-[#2A2A2A] bg-[#F7F7F7] dark:bg-[#1a2235] hover:border-[#AAAAAA] dark:hover:border-[#555] hover:bg-white dark:hover:bg-[#1a2235]"
+                      ? "border-red-400 bg-red-50 dark:bg-red-900/10"
+                      : "border-[var(--border-main)] bg-[var(--bg-sub)] hover:border-[var(--color-primary)] hover:bg-[var(--color-primary)]/[0.02]"
                   }`}
                 onClick={() => fileRef.current?.click()}
                 onDragOver={(e) => e.preventDefault()}
@@ -549,11 +545,13 @@ export default function ListingForm({
                   handleFiles(e.dataTransfer.files);
                 }}
               >
-                <Upload size={22} className="text-[#AAAAAA]" />
-                <p className="text-[13px] font-medium text-[#111] dark:text-white">
-                  Drop photos here or <span className="underline">browse</span>
+                <div className="w-14 h-14 rounded-2xl bg-white dark:bg-white/5 flex items-center justify-center premium-shadow text-[var(--color-primary)]">
+                  <Upload size={24} />
+                </div>
+                <p className="text-[15px] font-bold text-[var(--text-main)] mt-2">
+                  Drop photos here or <span className="text-[var(--color-primary)] underline">browse</span>
                 </p>
-                <p className="text-[11px] text-[#AAAAAA]">
+                <p className="text-[12px] text-[var(--text-sub)] font-medium">
                   JPG, PNG, WEBP up to 10MB each
                 </p>
                 <input
@@ -566,11 +564,11 @@ export default function ListingForm({
                 />
               </div>
               {form.photos.length > 0 && (
-                <div className="grid grid-cols-5 gap-2">
+                <div className="grid grid-cols-4 gap-3">
                   {form.photos.map((file, i) => (
                     <div
                       key={i}
-                      className="relative aspect-square rounded-xl overflow-hidden border border-[#EBEBEB] dark:border-[#2A2A2A] group"
+                      className="relative aspect-square rounded-2xl overflow-hidden border-2 border-[var(--border-main)] group premium-shadow"
                     >
                       <img
                         src={
@@ -579,31 +577,31 @@ export default function ListingForm({
                             : URL.createObjectURL(file)
                         }
                         alt=""
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                       />
                       {i === 0 && (
-                        <span className="absolute bottom-1 left-1 bg-[#111] text-white text-[9px] font-bold px-1.5 py-0.5 rounded">
+                        <span className="absolute bottom-2 left-2 bg-[var(--color-primary)] text-white text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded-lg premium-shadow">
                           Cover
                         </span>
                       )}
                       <button
-                        className="absolute top-1 right-1 w-4.5 h-4.5 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity border-none cursor-pointer"
+                        className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500 border-none cursor-pointer backdrop-blur-sm"
                         onClick={(e) => {
                           e.stopPropagation();
                           removePhoto(i);
                         }}
                       >
-                        <X size={9} strokeWidth={3} />
+                        <X size={12} strokeWidth={3} />
                       </button>
                     </div>
                   ))}
                   {form.photos.length < 10 && (
                     <button
-                      className="aspect-square rounded-xl border border-dashed border-[#EBEBEB] dark:border-[#2A2A2A] bg-[#F7F7F7] dark:bg-[#1a2235] flex flex-col items-center justify-center gap-1 text-[#AAAAAA] hover:border-[#AAAAAA] dark:hover:border-[#555] hover:text-[#717171] transition-all text-[10px] font-medium cursor-pointer"
+                      className="aspect-square rounded-2xl border-2 border-dashed border-[var(--border-main)] bg-[var(--bg-sub)] flex flex-col items-center justify-center gap-2 text-[var(--text-sub)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] transition-all duration-300 cursor-pointer"
                       onClick={() => fileRef.current?.click()}
                     >
-                      <ImageIcon size={16} />
-                      <span>Add more</span>
+                      <ImageIcon size={20} />
+                      <span className="text-[11px] font-bold">Add more</span>
                     </button>
                   )}
                 </div>
@@ -612,16 +610,16 @@ export default function ListingForm({
           )}
 
           {step === 4 && (
-            <div className="flex flex-col gap-5">
+            <div className="flex flex-col gap-6 animate-fade-up">
               <div>
-                <h2 className="text-xl font-semibold text-[#111] dark:text-white">
+                <h2 className="font-heading text-2xl font-bold text-[var(--text-main)]">
                   Review & publish
                 </h2>
-                <p className="text-[13px] text-[#717171] mt-1">
+                <p className="text-[14px] text-[var(--text-sub)] mt-1.5">
                   Everything look good? You can always edit after publishing.
                 </p>
               </div>
-              <div className="border border-[#EBEBEB] dark:border-[#2A2A2A] rounded-xl overflow-hidden max-h-96 overflow-y-auto">
+              <div className="border-2 border-[var(--border-main)] rounded-[1.5rem] overflow-hidden bg-[var(--bg-main)] premium-shadow">
                 <ReviewRow
                   label="Title"
                   value={form.title || "—"}
@@ -679,44 +677,29 @@ export default function ListingForm({
           )}
         </div>
 
-        <div className="flex items-center justify-between px-5 py-3.5 border-t border-[#EBEBEB] dark:border-[#2A2A2A]">
+        <div className="flex items-center justify-between px-6 py-5 border-t border-[var(--border-main)] bg-[var(--bg-sub)]">
           <button
             onClick={step === 0 ? onClose : prev}
             disabled={mutation.isPending}
-            className="inline-flex items-center gap-1 px-4 py-2 bg-transparent border border-[#EBEBEB] dark:border-[#2A2A2A] rounded-xl text-[13px] font-medium text-[#717171] hover:border-[#AAAAAA] dark:hover:border-[#555] hover:text-[#111] dark:hover:text-white transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            className="button-secondary !py-2 !px-5 !text-[13px]"
           >
-            {step === 0 ? (
-              "Cancel"
-            ) : (
-              <>
-                <ChevronLeft size={14} /> Back
-              </>
-            )}
+            {step === 0 ? "Cancel" : "Back"}
           </button>
           <button
             onClick={step === 4 ? handleSubmit : next}
             disabled={mutation.isPending}
-            className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-[13px] font-semibold transition-all active:scale-95 cursor-pointer border
-              ${
-                step === 4
-                  ? "bg-[#008A05] border-[#008A05] text-white hover:opacity-80"
-                  : "bg-[#111] dark:bg-white border-[#111] dark:border-white text-white dark:text-[#111] hover:opacity-80"
-              } disabled:opacity-50 disabled:cursor-not-allowed`}
+            className="button-primary !py-2 !px-6 !text-[13px] flex items-center gap-2"
           >
             {step === 4 ? (
               mutation.isPending ? (
                 <>
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   {isEditing ? "Saving..." : "Publishing..."}
                 </>
-              ) : isEditing ? (
-                "Save Changes"
-              ) : (
-                "Publish listing"
-              )
+              ) : isEditing ? "Save Changes" : "Publish listing"
             ) : (
               <>
-                Continue <ChevronRight size={14} />
+                Continue <ChevronRight size={14} strokeWidth={2.5} />
               </>
             )}
           </button>

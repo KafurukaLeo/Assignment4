@@ -38,11 +38,7 @@ type Favorite = {
   };
 };
 
-const NAV_ITEMS = [
-  { label: "Homes", to: "/", icon: Home },
-  { label: "Stays", to: "/all-listings", icon: MapPin },
-  { label: "Contact", to: "/#contact", icon: Phone },
-];
+
 
 export default function Navbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -165,8 +161,14 @@ export default function Navbar() {
 
   const navBg =
     scrolled || !isHome
-      ? "bg-white/90 dark:bg-[#0a0a0f]/90 backdrop-blur-xl"
+      ? "glass border-b"
       : "bg-transparent";
+
+  const navItems = [
+    { label: "Listings", to: "/all-listings", icon: MapPin },
+    { label: "Homes", to: "/", icon: Home },
+    { label: "Contact", to: "/#contact", icon: Phone },
+  ];
 
   return (
     <>
@@ -174,24 +176,34 @@ export default function Navbar() {
         className={`fixed inset-x-0 top-0 z-50 transition-all duration-500 ${navBg}`}
       >
         <div className="mx-auto max-w-7xl px-4 md:px-8">
-          <div className="flex h-[68px] items-center justify-between gap-4">
+          <div className="flex h-[72px] items-center justify-between gap-4">
             <Logo />
 
-
             {/* Desktop nav pills */}
-            <nav className="hidden md:flex items-center gap-1 bg-gray-100/70 dark:bg-white/[0.06] rounded-full px-1.5 py-1.5">
-              {NAV_ITEMS.map((item) => {
+            <nav className="hidden md:flex items-center gap-1 bg-gray-100/50 dark:bg-white/[0.03] rounded-full px-1.5 py-1.5 border border-black/5 dark:border-white/5">
+              {navItems.map((item) => {
                 const isActive =
                   location.pathname === item.to && item.to !== "/#contact";
                 return (
                   <Link
                     key={item.label}
                     to={item.to}
+                    onClick={(e) => {
+                      if (item.label === "Contact") {
+                        if (location.pathname === "/") {
+                          e.preventDefault();
+                          const el = document.getElementById("contact");
+                          if (el) {
+                            el.scrollIntoView({ behavior: "smooth", block: "start" });
+                          }
+                        }
+                      }
+                    }}
                     className={[
-                      "relative px-4 py-1.5 rounded-full text-[13px] font-semibold transition-all duration-200",
+                      "relative px-5 py-2 rounded-full text-[13px] font-medium transition-all duration-300",
                       isActive
-                        ? "bg-white dark:bg-white/[0.1] text-gray-900 dark:text-white shadow-sm"
-                        : "text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200",
+                        ? "bg-white dark:bg-white/[0.1] text-[var(--color-primary)] shadow-sm font-semibold"
+                        : "text-[var(--text-sub)] hover:text-[var(--text-main)]",
                     ].join(" ")}
                   >
                     {item.label}
@@ -203,26 +215,28 @@ export default function Navbar() {
             {/* Expandable search pill */}
             <div
               ref={searchRef}
-              className="relative hidden md:block flex-1 max-w-[360px]"
+              className="relative hidden md:block flex-1 max-w-[380px]"
             >
               <button
                 onClick={() => setIsSearchExpanded((value) => !value)}
                 className={[
-                  "group w-full flex items-center gap-3 px-4 py-2.5 rounded-full border bg-white dark:bg-white/[0.05] transition-all duration-200 text-left",
+                  "group w-full flex items-center gap-3 px-5 py-2.5 rounded-full border bg-white/50 dark:bg-white/[0.02] transition-all duration-300 text-left",
                   isSearchExpanded
-                    ? "border-[var(--color-primary)] shadow-lg shadow-black/10"
-                    : "border-gray-200 dark:border-white/[0.1] hover:shadow-md",
+                    ? "border-[var(--color-primary)] ring-4 ring-[var(--color-primary)]/5 premium-shadow-lg"
+                    : "border-[var(--border-main)] hover:premium-shadow hover:bg-white dark:hover:bg-white/5",
                 ].join(" ")}
               >
-                <Search className="h-3.5 w-3.5 text-gray-400 group-hover:text-[var(--color-primary)] transition-colors" />
-                <span className="flex-1 text-[13px] text-gray-500 dark:text-gray-400 truncate">
-                  {getSearchSummary(where, maxPrice, guests)}
-                </span>
-                {(where || maxPrice || guests) && (
-                  <span className="w-2 h-2 rounded-full bg-[var(--color-primary)] shrink-0" />
-                )}
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--color-primary)] text-white shrink-0 shadow-sm">
+                  <Search className="h-3.5 w-3.5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[11px] font-bold uppercase tracking-widest text-[var(--text-sub)] group-hover:text-[var(--color-primary)] transition-colors">Search</p>
+                  <p className="text-[13px] text-[var(--text-main)] truncate font-medium">
+                    {getSearchSummary(where, maxPrice, guests)}
+                  </p>
+                </div>
                 <ChevronDown
-                  className={`h-3.5 w-3.5 text-gray-400 transition-transform ${
+                  className={`h-4 w-4 text-[var(--text-sub)] transition-transform duration-300 ${
                     isSearchExpanded ? "rotate-180" : ""
                   }`}
                 />
@@ -243,7 +257,7 @@ export default function Navbar() {
             </div>
 
             {/* Right side actions */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5">
               <ThemeToggle />
 
               {/* Notifications */}
@@ -251,11 +265,11 @@ export default function Navbar() {
                 <div className="relative" ref={notificationRef}>
                   <button
                     onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
-                    className="relative flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 dark:border-white/[0.1] bg-white dark:bg-white/[0.05] text-gray-700 dark:text-gray-200 transition-all hover:shadow-md"
+                    className="relative flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border-main)] bg-[var(--bg-sub)] text-[var(--text-main)] transition-all hover:premium-shadow hover:scale-105 active:scale-95"
                   >
-                    <Bell className="h-4 w-4" />
+                    <Bell className="h-4.5 w-4.5" />
                     {unreadCount > 0 && (
-                      <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--color-primary)] text-[9px] font-bold text-white ring-2 ring-white dark:ring-[#0a0a0f]">
+                      <span className="absolute top-0 right-0 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-[var(--color-primary)] text-[10px] font-bold text-white ring-2 ring-white dark:ring-[#0F0F12]">
                         {unreadCount > 9 ? "9+" : unreadCount}
                       </span>
                     )}
@@ -276,26 +290,16 @@ export default function Navbar() {
               {user && (
                 <Link
                   to="/favorites"
-                  className="hidden md:flex items-center gap-1.5 px-3 py-2 rounded-full text-[13px] font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/[0.07] transition-colors"
+                  className="hidden md:flex items-center gap-2 px-4 py-2.5 rounded-full text-[13px] font-semibold text-[var(--text-sub)] hover:bg-[var(--bg-sub)] hover:text-[var(--text-main)] transition-all"
                 >
                   <Heart
-                    className={`h-4 w-4 ${favoritesCount > 0 ? "fill-[var(--color-primary)] text-[var(--color-primary)]" : ""}`}
+                    className={`h-4 w-4 transition-colors ${favoritesCount > 0 ? "fill-[var(--color-primary)] text-[var(--color-primary)]" : ""}`}
                   />
                   {favoritesCount > 0 && (
-                    <span className="text-[var(--color-primary)] font-semibold">
+                    <span className="text-[var(--color-primary)]">
                       {favoritesCount}
                     </span>
                   )}
-                </Link>
-              )}
-
-              {/* Become a Host / Host Dashboard link */}
-              {user && user.role !== "admin" && (
-                <Link
-                  to={user.role === "host" ? "/dashboard" : "/become-a-host"}
-                  className="hidden lg:flex items-center gap-2 px-4 py-2 rounded-full text-[13px] font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/[0.06] transition-all"
-                >
-                  {user.role === "host" ? "Switch to Hosting" : "Become a Host"}
                 </Link>
               )}
 
@@ -303,16 +307,13 @@ export default function Navbar() {
               <div className="relative" ref={profileRef}>
                 <button
                   onClick={() => setIsProfileOpen((v) => !v)}
-                  className="flex items-center gap-2.5 px-3 py-2 rounded-full border border-gray-200 dark:border-white/[0.1] bg-white dark:bg-white/[0.05] hover:shadow-md transition-all duration-200"
+                  className="flex items-center gap-3 px-3.5 py-2 rounded-full border border-[var(--border-main)] bg-[var(--bg-main)] hover:premium-shadow hover:border-[var(--color-primary)]/30 transition-all duration-300"
                   aria-expanded={isProfileOpen}
                   aria-haspopup="true"
                 >
-                  <Avatar user={user} size={24} />
-                  <span className="hidden sm:block text-[13px] font-semibold text-gray-800 dark:text-gray-200 max-w-[80px] truncate">
-                    {user?.name?.split(" ")[0] || "Menu"}
-                  </span>
+                  <Avatar user={user} size={28} />
                   <ChevronDown
-                    className={`h-3.5 w-3.5 text-gray-400 transition-transform duration-200 ${isProfileOpen ? "rotate-180" : ""}`}
+                    className={`h-3.5 w-3.5 text-[var(--text-sub)] transition-transform duration-300 ${isProfileOpen ? "rotate-180" : ""}`}
                   />
                 </button>
 
@@ -326,42 +327,7 @@ export default function Navbar() {
                   />
                 )}
               </div>
-
-              {/* Mobile hamburger */}
-              <button
-                onClick={() => setIsMobileMenuOpen((v) => !v)}
-                aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
-                className="md:hidden flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 dark:border-white/[0.1] bg-white dark:bg-white/[0.05] text-gray-700 dark:text-gray-200 transition-colors hover:shadow-md"
-              >
-                {isMobileMenuOpen ? (
-                  <X className="h-4 w-4" />
-                ) : (
-                  <svg
-                    className="h-4 w-4"
-                    fill="none"
-                    viewBox="0 0 16 16"
-                    stroke="currentColor"
-                    strokeWidth={1.8}
-                  >
-                    <line x1="2" y1="5" x2="14" y2="5" />
-                    <line x1="2" y1="11" x2="14" y2="11" />
-                  </svg>
-                )}
-              </button>
             </div>
-          </div>
-
-          {/* Mobile search bar (always visible on mobile) */}
-          <div className="md:hidden pb-3">
-            <MobileSearchBar
-              where={where}
-              setWhere={setWhere}
-              maxPrice={maxPrice}
-              setMaxPrice={setMaxPrice}
-              guests={guests}
-              setGuests={setGuests}
-              onSearch={runSearch}
-            />
           </div>
         </div>
       </header>
@@ -391,76 +357,6 @@ export default function Navbar() {
   );
 }
 
-function MobileSearchBar({
-  where,
-  setWhere,
-  maxPrice,
-  setMaxPrice,
-  guests,
-  setGuests,
-  onSearch,
-}: {
-  where: string;
-  setWhere: (v: string) => void;
-  maxPrice: string;
-  setMaxPrice: (v: string) => void;
-  guests: string;
-  setGuests: (v: string) => void;
-  onSearch: () => void;
-}) {
-  const [expanded, setExpanded] = useState(false);
-  return (
-    <div className="flex flex-col gap-1.5 rounded-2xl border border-gray-200 dark:border-white/[0.1] bg-white dark:bg-white/[0.04] overflow-hidden">
-      <div className="flex items-center gap-2 px-3 py-2.5">
-        <Search className="h-4 w-4 text-gray-400 shrink-0" />
-        <input
-          value={where}
-          onChange={(e) => setWhere(e.target.value)}
-          onFocus={() => setExpanded(true)}
-          onKeyDown={(e) => e.key === "Enter" && onSearch()}
-          placeholder="Where are you going?"
-          className="flex-1 bg-transparent text-sm text-gray-800 dark:text-gray-100 outline-none placeholder:text-gray-400"
-        />
-        <button
-          onClick={onSearch}
-          className="h-8 w-8 flex items-center justify-center rounded-xl bg-[var(--color-primary)] text-white shrink-0"
-        >
-          <Search className="h-3.5 w-3.5" />
-        </button>
-      </div>
-      {expanded && (
-        <div className="flex border-t border-gray-100 dark:border-white/[0.06]">
-          <label className="flex flex-col px-3 py-2 flex-1 border-r border-gray-100 dark:border-white/[0.06]">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-0.5">
-              Max price
-            </span>
-            <input
-              type="number"
-              min={1}
-              value={maxPrice}
-              onChange={(e) => setMaxPrice(e.target.value)}
-              placeholder="Any"
-              className="bg-transparent text-sm text-gray-800 dark:text-gray-100 outline-none placeholder:text-gray-400 w-full"
-            />
-          </label>
-          <label className="flex flex-col px-3 py-2 flex-1">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-0.5">
-              Guests
-            </span>
-            <input
-              type="number"
-              min={1}
-              value={guests}
-              onChange={(e) => setGuests(e.target.value)}
-              placeholder="Any"
-              className="bg-transparent text-sm text-gray-800 dark:text-gray-100 outline-none placeholder:text-gray-400 w-full"
-            />
-          </label>
-        </div>
-      )}
-    </div>
-  );
-}
 
 function DesktopSearchPanel({
   where,
@@ -725,9 +621,25 @@ function MobileMenu({
         <MobileItem
           to="/all-listings"
           close={close}
+          icon={MapPin}
+          label="Listings"
+          desc="Browse all stays"
+        />
+        {user && (
+          <MobileItem
+            to={user.role === "host" ? "/dashboard/bookings" : "/bookings"}
+            close={close}
+            icon={CalendarDays}
+            label="Bookings"
+            desc="Your reservations"
+          />
+        )}
+        <MobileItem
+          to="/"
+          close={close}
           icon={Home}
           label="Homes"
-          desc="Browse all listings"
+          desc="Homepage & categories"
         />
         {user?.role === "admin" && (
           <MobileItem
@@ -757,13 +669,6 @@ function MobileMenu({
           />
         )}
         <MobileItem
-          to="/dashboard/bookings"
-          close={close}
-          icon={CalendarDays}
-          label="Bookings"
-          desc="Your reservations"
-        />
-        <MobileItem
           to="/dashboard/messages"
           close={close}
           icon={MessageCircle}
@@ -776,6 +681,22 @@ function MobileMenu({
           icon={Heart}
           label="Saved places"
           desc={favoritesCount ? `${favoritesCount} saved` : "None saved yet"}
+        />
+        <MobileItem
+          to="/#contact"
+          close={close}
+          onClick={(e) => {
+            if (window.location.pathname === "/") {
+              e.preventDefault();
+              const el = document.getElementById("contact");
+              if (el) {
+                el.scrollIntoView({ behavior: "smooth", block: "start" });
+              }
+            }
+          }}
+          icon={Phone}
+          label="Contact Us"
+          desc="Get assistance or support"
         />
         {!user && (
           <>
@@ -850,17 +771,22 @@ function MobileItem({
   label,
   desc,
   close,
+  onClick,
 }: {
   to: string;
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   desc: string;
   close: () => void;
+  onClick?: (e: React.MouseEvent) => void;
 }) {
   return (
     <Link
       to={to}
-      onClick={close}
+      onClick={(e) => {
+        close();
+        if (onClick) onClick(e);
+      }}
       className="flex items-center gap-3 px-3 py-3 rounded-xl text-left hover:bg-gray-50 dark:hover:bg-white/[0.04] transition-colors group"
     >
       <span className="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-100 dark:bg-white/[0.07] group-hover:bg-[var(--color-primary)]/10 transition-colors">

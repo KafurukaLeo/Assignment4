@@ -119,6 +119,9 @@ export const updateReview = async (req: Request, res: Response) => {
 
     // FR-059: recalculate listing average rating after review is updated
     await recalculateListingRating(review.listingId).catch(console.error);
+
+    // Invalidate cached AI review summary for this listing
+    deleteCache(`review-summary:${review.listingId}`);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Failed to update review" });
@@ -149,6 +152,9 @@ export const deleteReview = async (req: Request, res: Response) => {
 
     // FR-059: recalculate listing average rating after review is removed
     await recalculateListingRating(review.listingId).catch(console.error);
+
+    // Invalidate cached AI review summary for this listing
+    deleteCache(`review-summary:${review.listingId}`);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Failed to delete review" });

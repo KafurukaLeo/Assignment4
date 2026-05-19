@@ -207,6 +207,11 @@ export default function ListingDetail() {
       return;
     }
 
+    if (user.role === "host") {
+      toast.error("Hosts cannot create bookings. Switch to a guest account to book properties.");
+      return;
+    }
+
     if (!checkIn || !checkOut) {
       toast.error("Please select check-in and check-out dates");
       return;
@@ -221,117 +226,102 @@ export default function ListingDetail() {
   };
 
   return (
-    <div className="min-h-screen pb-14">
-      <div className="mx-auto w-full max-w-6xl">
-        <div className="mb-5 flex items-center justify-between gap-4">
+    <div className="min-h-screen pb-24 animate-fade-in">
+      <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="mb-6 flex items-center justify-between gap-4 py-4">
           <button
             onClick={() => navigate(-1)}
-            className="inline-flex items-center gap-2 text-[13px] font-semibold text-gray-600 transition-colors hover:text-gray-950 dark:text-gray-300 dark:hover:text-white"
+            className="button-secondary !py-2 !px-4 !text-[13px] flex items-center gap-2"
           >
             <ChevronLeft className="h-4 w-4" />
-            Back
+            Back to explore
           </button>
-          <div className="flex items-center gap-2">
-            <button className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 text-gray-700 transition-colors hover:bg-gray-50 dark:border-white/[0.08] dark:text-gray-300 dark:hover:bg-white/[0.04]">
-              <Share2 className="h-4 w-4" />
+          <div className="flex items-center gap-3">
+            <button className="w-10 h-10 flex items-center justify-center rounded-full bg-[var(--bg-sub)] border border-[var(--border-main)] text-[var(--text-sub)] hover:text-[var(--text-main)] transition-all">
+              <Share2 className="h-4.5 w-4.5" />
             </button>
             <button
               onClick={handleToggleFavorite}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 text-gray-700 transition-colors hover:bg-gray-50 dark:border-white/[0.08] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+              className="w-10 h-10 flex items-center justify-center rounded-full bg-[var(--bg-sub)] border border-[var(--border-main)] text-[var(--text-sub)] hover:text-[var(--text-main)] transition-all"
             >
               <Heart
-                className={`h-4 w-4 ${isSaved ? "fill-[var(--color-primary)] text-[var(--color-primary)]" : ""}`}
+                className={`h-4.5 w-4.5 transition-all ${isSaved ? "fill-[var(--color-primary)] text-[var(--color-primary)] scale-110" : ""}`}
               />
             </button>
           </div>
         </div>
 
-        <header className="mb-5">
-          <h1 className="max-w-4xl text-2xl font-semibold tracking-tight text-gray-950 dark:text-white md:text-3xl">
+        <header className="mb-8">
+          <h1 className="font-heading text-3xl font-bold tracking-tight text-[var(--text-main)] md:text-4xl leading-tight">
             {listing.title}
           </h1>
-          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-[14px] text-gray-500 dark:text-gray-400">
+          <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-3 text-[14px] font-semibold text-[var(--text-sub)]">
             {listing.rating && (
-              <span className="inline-flex items-center gap-1 font-semibold text-gray-950 dark:text-white">
-                <Star className="h-4 w-4 fill-gray-900 stroke-none dark:fill-white" />
+              <span className="inline-flex items-center gap-1.5 text-[var(--text-main)] bg-[var(--bg-sub)] px-3 py-1 rounded-lg border border-[var(--border-main)]">
+                <Star className="h-4 w-4 fill-amber-400 stroke-none" />
                 {formatRating(listing.rating)}
               </span>
             )}
-            <span className="inline-flex items-center gap-1.5">
-              <MapPin className="h-4 w-4" />
+            <span className="inline-flex items-center gap-2">
+              <MapPin className="h-4.5 w-4.5 text-[var(--color-primary)]" />
               {listing.location}
             </span>
-            <span className="inline-flex items-center gap-1.5 capitalize">
-              <Home className="h-4 w-4" />
+            <span className="inline-flex items-center gap-2 capitalize">
+              <Home className="h-4.5 w-4.5 text-[var(--color-primary)]" />
               {listing.type}
             </span>
           </div>
         </header>
 
-        <section className="mb-8">
-          <div className="relative overflow-hidden rounded-xl bg-gray-100 dark:bg-white/[0.05] md:hidden">
+        <section className="mb-12">
+          <div className="relative overflow-hidden rounded-[2.5rem] bg-[var(--bg-sub)] border border-[var(--border-main)] premium-shadow-lg md:hidden">
             <img
               src={currentImage}
               alt={listing.title}
-              className="h-80 w-full object-cover"
+              className="h-[400px] w-full object-cover"
             />
             {images.length > 1 && (
               <>
                 <button
                   onClick={prevSlide}
-                  className="absolute left-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-gray-950 shadow-sm"
+                  className="absolute left-4 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/20 backdrop-blur-md border border-white/30 text-white shadow-xl active:scale-90 transition-all"
                   aria-label="Previous image"
                 >
-                  <ChevronLeft className="h-4 w-4" />
+                  <ChevronLeft className="h-5 w-5" />
                 </button>
                 <button
                   onClick={nextSlide}
-                  className="absolute right-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-gray-950 shadow-sm"
+                  className="absolute right-4 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/20 backdrop-blur-md border border-white/30 text-white shadow-xl active:scale-90 transition-all"
                   aria-label="Next image"
                 >
-                  <ChevronRight className="h-4 w-4" />
+                  <ChevronRight className="h-5 w-5" />
                 </button>
               </>
             )}
+            <div className="absolute bottom-4 right-4 bg-black/40 backdrop-blur-md text-white px-3 py-1.5 rounded-xl text-[11px] font-bold tracking-widest uppercase">
+              {sliderIndex + 1} / {images.length}
+            </div>
           </div>
 
-          {thumbnailImages.length > 0 && (
-            <div className="mt-2 grid grid-cols-3 gap-2 md:hidden">
-              {thumbnailImages.map(({ photo, index }) => (
-                <button
-                  key={`${photo}-${index}`}
-                  onClick={() => setSliderIndex(index)}
-                  className="aspect-[4/3] overflow-hidden rounded-lg bg-gray-100 dark:bg-white/[0.05]"
-                >
-                  <img
-                    src={getImageUrl(photo)}
-                    alt={`${listing.title} ${index + 1}`}
-                    className="h-full w-full object-cover"
-                  />
-                </button>
-              ))}
-            </div>
-          )}
-
-          <div className="hidden h-[430px] grid-cols-[minmax(0,1fr)_180px] gap-2 md:grid">
-            <div className="overflow-hidden rounded-xl bg-gray-100 dark:bg-white/[0.05]">
+          <div className="hidden h-[500px] grid-cols-[minmax(0,1fr)_240px] gap-4 md:grid">
+            <div className="overflow-hidden rounded-[2.5rem] bg-[var(--bg-sub)] border border-[var(--border-main)] premium-shadow-lg group">
               <img
                 src={currentImage}
                 alt={listing.title}
-                className="h-full w-full object-cover"
+                className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
               />
             </div>
-            <div className="grid grid-rows-3 gap-2">
+            <div className="grid grid-rows-3 gap-4">
               {thumbnailImages.map(({ photo, index }) => (
                 <button
                   key={`${photo}-${index}`}
                   onClick={() => setSliderIndex(index)}
-                  className="overflow-hidden rounded-xl bg-gray-100 dark:bg-white/[0.05]"
+                  className="overflow-hidden rounded-[2rem] bg-[var(--bg-sub)] border border-[var(--border-main)] premium-shadow hover:premium-shadow-lg transition-all group"
                 >
                   <img
                     src={getImageUrl(photo)}
                     alt={`${listing.title} ${index + 1}`}
-                    className="h-full w-full object-cover transition-transform duration-200 hover:scale-105"
+                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
                   />
                 </button>
               ))}
@@ -339,48 +329,48 @@ export default function ListingDetail() {
           </div>
         </section>
 
-        <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_330px] lg:gap-12">
+        <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-20">
           <main className="min-w-0">
-            <section className="border-b border-gray-200 pb-6 dark:border-white/[0.08]">
-              <div className="flex items-start justify-between gap-5">
+            <section className="border-b border-[var(--border-main)] pb-8">
+              <div className="flex items-center justify-between gap-6">
                 <div>
-                  <h2 className="text-xl capitalize font-semibold text-gray-950 dark:text-white">
-                    {listing.type}
+                  <h2 className="font-heading text-2xl font-bold text-[var(--text-main)] capitalize">
+                    {listing.type} hosted by {listing.host?.name || "Host"}
                   </h2>
-                  <p className="mt-2 text-[14px] text-gray-500 dark:text-gray-400">
+                  <p className="mt-2 text-[15px] font-medium text-[var(--text-sub)]">
                     Up to {listing.guests}{" "}
-                    {listing.guests === 1 ? "guest" : "guests"}
+                    {listing.guests === 1 ? "guest" : "guests"} • {listing.amenities?.length || 0} amenities
                   </p>
                 </div>
                 <HostAvatar listing={listing} />
               </div>
             </section>
 
-            <section className="grid gap-3 border-b border-gray-200 py-6 dark:border-white/[0.08] sm:grid-cols-3">
+            <section className="grid gap-4 border-b border-[var(--border-main)] py-10 sm:grid-cols-3">
               <Fact icon={Users} label="Guests" value={`${listing.guests}`} />
-              <Fact icon={Home} label="Type" value={listing.type} />
+              <Fact icon={Home} label="Property" value={listing.type} />
               <Fact
                 icon={CalendarDays}
-                label="Nightly"
+                label="Per Night"
                 value={`$${listing.pricePerNight}`}
               />
             </section>
 
-            <section className="border-b border-gray-200 py-7 dark:border-white/[0.08]">
-              <h2 className="text-xl font-semibold text-gray-950 dark:text-white">
+            <section className="border-b border-[var(--border-main)] py-10">
+              <h2 className="font-heading text-2xl font-bold text-[var(--text-main)]">
                 About this place
               </h2>
-              <p className="mt-4 max-w-3xl text-[15px] leading-7 text-gray-600 dark:text-gray-300">
+              <p className="mt-5 max-w-3xl text-[16px] leading-relaxed text-[var(--text-sub)] font-medium">
                 {listing.description ||
                   "This stay has the essentials for a comfortable visit."}
               </p>
             </section>
 
-            <section className="border-b border-gray-200 py-7 dark:border-white/[0.08]">
-              <h2 className="text-xl font-semibold text-gray-950 dark:text-white">
+            <section className="border-b border-[var(--border-main)] py-10">
+              <h2 className="font-heading text-2xl font-bold text-[var(--text-main)]">
                 What this place offers
               </h2>
-              <div className="mt-5 grid gap-x-8 gap-y-4 sm:grid-cols-2">
+              <div className="mt-6 grid gap-x-12 gap-y-6 sm:grid-cols-2">
                 {(listing.amenities?.length
                   ? listing.amenities
                   : ["Private stay", "Guest ready"]
@@ -389,9 +379,11 @@ export default function ListingDetail() {
                   return (
                     <div
                       key={amenity}
-                      className="flex items-center gap-3 text-[14px] text-gray-700 dark:text-gray-300"
+                      className="flex items-center gap-4 text-[15px] font-bold text-[var(--text-main)] group"
                     >
-                      <Icon className="h-5 w-5 text-gray-700 dark:text-gray-300" />
+                      <div className="w-10 h-10 rounded-xl bg-[var(--bg-sub)] flex items-center justify-center text-[var(--text-sub)] group-hover:text-[var(--color-primary)] group-hover:bg-[var(--color-primary)]/5 transition-all">
+                        <Icon className="h-5 w-5" />
+                      </div>
                       <span className="capitalize">{amenity}</span>
                     </div>
                   );
@@ -399,12 +391,12 @@ export default function ListingDetail() {
               </div>
             </section>
 
-            <section className="border-b border-gray-200 py-7 dark:border-white/[0.08]">
-              <h2 className="text-xl font-semibold text-gray-950 dark:text-white">
-                Location
+            <section className="py-10">
+              <h2 className="font-heading text-2xl font-bold text-[var(--text-main)]">
+                Where you'll be
               </h2>
               
-              <div className="mt-4 mb-2 grid gap-4 sm:grid-cols-3">
+              <div className="mt-6 mb-8 grid gap-4 sm:grid-cols-3">
                 {(() => {
                   const parts = listing.location.split(',').map(p => p.trim());
                   let street = '', city = '', country = '';
@@ -424,29 +416,29 @@ export default function ListingDetail() {
                   return (
                     <>
                       {street && (
-                        <div className="flex flex-col gap-1 rounded-xl bg-gray-50 p-3 dark:bg-white/[0.04]">
-                          <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">Street / Area</span>
-                          <span className="text-[14px] font-medium text-gray-950 dark:text-white">{street}</span>
+                        <div className="flex flex-col gap-1.5 rounded-2xl bg-[var(--bg-sub)] p-5 border border-[var(--border-main)]">
+                          <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-sub)]">Street / Area</span>
+                          <span className="text-[15px] font-bold text-[var(--text-main)]">{street}</span>
                         </div>
                       )}
-                      <div className="flex flex-col gap-1 rounded-xl bg-gray-50 p-3 dark:bg-white/[0.04]">
-                        <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">City</span>
-                        <span className="text-[14px] font-medium text-gray-950 dark:text-white">{city}</span>
+                      <div className="flex flex-col gap-1.5 rounded-2xl bg-[var(--bg-sub)] p-5 border border-[var(--border-main)]">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-sub)]">City</span>
+                        <span className="text-[15px] font-bold text-[var(--text-main)]">{city}</span>
                       </div>
-                      <div className="flex flex-col gap-1 rounded-xl bg-gray-50 p-3 dark:bg-white/[0.04]">
-                        <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">Country / Region</span>
-                        <span className="text-[14px] font-medium text-gray-950 dark:text-white">{country}</span>
+                      <div className="flex flex-col gap-1.5 rounded-2xl bg-[var(--bg-sub)] p-5 border border-[var(--border-main)]">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-sub)]">Region</span>
+                        <span className="text-[15px] font-bold text-[var(--text-main)]">{country}</span>
                       </div>
                     </>
                   );
                 })()}
               </div>
 
-              <div className="mt-5 overflow-hidden rounded-xl border border-gray-200 bg-gray-100 dark:border-white/[0.08] dark:bg-white/[0.05]">
+              <div className="mt-6 overflow-hidden rounded-[2.5rem] border-2 border-[var(--border-main)] bg-[var(--bg-sub)] premium-shadow">
                 <iframe
                   title="Property location"
                   width="100%"
-                  height="300"
+                  height="400"
                   style={{ border: 0 }}
                   loading="lazy"
                   allowFullScreen
@@ -457,100 +449,98 @@ export default function ListingDetail() {
             </section>
           </main>
 
-          <aside className="lg:sticky lg:top-24 lg:self-start">
-            <div className="rounded-[1.75rem] border border-gray-200 bg-white p-5 shadow-lg shadow-black/[0.05] dark:border-white/[0.08] dark:bg-[#111827] dark:shadow-black/25">
-              <div className="flex items-start justify-between gap-4">
+          <aside className="lg:sticky lg:top-32 lg:self-start">
+            <div className="rounded-[2.5rem] border-2 border-[var(--border-main)] bg-[var(--bg-main)] p-8 premium-shadow-lg animate-fade-up">
+              <div className="flex items-center justify-between gap-4 mb-8">
                 <div>
-                  <p className="text-[13px] text-gray-500 dark:text-gray-400">
-                    Price
+                  <p className="text-[11px] font-black uppercase tracking-widest text-[var(--text-sub)]">
+                    Nightly Rate
                   </p>
-                  <p className="mt-1 text-2xl font-semibold text-gray-950 dark:text-white">
-                    ${listing.pricePerNight}
-                    <span className="text-[14px] font-normal text-gray-500">
-                      {" "}
-                      night
-                    </span>
-                  </p>
-                </div>
-                <span className="rounded-full bg-emerald-500/10 px-3 py-1.5 text-[12px] font-semibold text-emerald-600 dark:text-emerald-400">
-                  Instant Book
-                </span>
-              </div>
-
-              <div className="mt-5 overflow-hidden rounded-2xl border border-gray-200 dark:border-white/[0.08]">
-                <div className="grid grid-cols-2">
-                  <div className="border-r border-b border-gray-200 p-3 dark:border-white/[0.08]">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
-                      Check-in
-                    </p>
-                    <input
-                      type="date"
-                      value={checkIn}
-                      min={today}
-                      onChange={(e) => setCheckIn(e.target.value)}
-                      className="mt-1 w-full bg-transparent text-[13px] font-medium text-gray-950 outline-none dark:text-white"
-                    />
-                  </div>
-                  <div className="border-b border-gray-200 p-3 dark:border-white/[0.08]">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
-                      Check-out
-                    </p>
-                    <input
-                      type="date"
-                      value={checkOut}
-                      min={checkIn || today}
-                      onChange={(e) => setCheckOut(e.target.value)}
-                      className="mt-1 w-full bg-transparent text-[13px] font-medium text-gray-950 outline-none dark:text-white"
-                    />
+                  <div className="flex items-baseline gap-1 mt-1">
+                    <span className="text-3xl font-black text-[var(--text-main)]">${listing.pricePerNight}</span>
+                    <span className="text-[14px] font-bold text-[var(--text-sub)]">/ night</span>
                   </div>
                 </div>
-                <div className="p-3">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
-                    Guests
-                  </p>
-                  <p className="mt-1 text-[13px] font-medium text-gray-950 dark:text-white">
-                    Up to {listing.guests} guests
-                  </p>
+                <div className="px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-[11px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
+                  Instant
                 </div>
               </div>
 
-              <div className="mt-5 space-y-3 text-[14px]">
-                <div className="flex justify-between gap-4 text-gray-600 dark:text-gray-300">
-                  <span>${listing.pricePerNight} x {nights} nights</span>
-                  <span>${subtotal}</span>
+              <div className="space-y-4 mb-8">
+                <div className="grid grid-cols-2 gap-4">
+                   <div className="space-y-1.5">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-[var(--text-sub)] ml-1">Check-in</label>
+                      <input
+                        type="date"
+                        value={checkIn}
+                        min={today}
+                        onChange={(e) => setCheckIn(e.target.value)}
+                        className="input !py-2.5 !text-[13px]"
+                      />
+                   </div>
+                   <div className="space-y-1.5">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-[var(--text-sub)] ml-1">Check-out</label>
+                      <input
+                        type="date"
+                        value={checkOut}
+                        min={checkIn || today}
+                        onChange={(e) => setCheckOut(e.target.value)}
+                        className="input !py-2.5 !text-[13px]"
+                      />
+                   </div>
                 </div>
-                <div className="flex justify-between gap-4 text-gray-600 dark:text-gray-300">
-                  <span>Service fee (10%)</span>
-                  <span>${serviceFee}</span>
-                </div>
-                <div className="border-t border-gray-200 pt-3 dark:border-white/[0.08]">
-                  <div className="flex justify-between gap-4 text-[16px] font-bold text-gray-950 dark:text-white">
-                    <span>Total</span>
-                    <span>${totalPrice}</span>
-                  </div>
+                <div className="space-y-1.5">
+                   <label className="text-[10px] font-black uppercase tracking-widest text-[var(--text-sub)] ml-1">Guests</label>
+                   <div className="input !py-2.5 !text-[13px] flex items-center justify-between">
+                     <span>{listing.guests} guests max</span>
+                     <Users size={14} className="opacity-40" />
+                   </div>
                 </div>
               </div>
 
-              <button
-                onClick={handleReserve}
-                disabled={createBookingMutation.isPending || (nights <= 0 && !!checkIn && !!checkOut)}
-                className="mt-5 h-12 w-full rounded-xl bg-(--color-primary) px-5 text-[15px] font-bold text-white shadow-md transition-all hover:bg-(--color-primary-dark) active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {createBookingMutation.isPending ? "Reserving..." : "Reserve"}
-              </button>
+              {nights > 0 && (
+                <div className="space-y-3.5 mb-8 py-6 border-y border-[var(--border-main)] animate-fade-in">
+                  <div className="flex justify-between items-center text-[14px] font-bold">
+                    <span className="text-[var(--text-sub)]">${listing.pricePerNight} x {nights} nights</span>
+                    <span className="text-[var(--text-main)]">${subtotal}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-[14px] font-bold">
+                    <span className="text-[var(--text-sub)]">Service fee (10%)</span>
+                    <span className="text-[var(--text-main)]">${serviceFee}</span>
+                  </div>
+                  <div className="pt-2 flex justify-between items-center text-[18px] font-black">
+                    <span className="text-[var(--text-main)]">Total</span>
+                    <span className="text-[var(--color-primary)]">${totalPrice}</span>
+                  </div>
+                </div>
+              )}
+
+              {user?.role === "host" ? (
+                <div className="mb-4 text-center rounded-2xl bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/20 p-4 text-[13px] font-bold text-amber-700 dark:text-amber-400">
+                  Hosts cannot reserve properties. Switch to a guest account to book stays.
+                </div>
+              ) : (
+                <button
+                  onClick={handleReserve}
+                  disabled={createBookingMutation.isPending || (nights <= 0 && !!checkIn && !!checkOut)}
+                  className="button-primary !w-full !py-4 !text-[16px] mb-4"
+                >
+                  {createBookingMutation.isPending ? "Reserving..." : "Reserve stay"}
+                </button>
+              )}
               
               <button
                 onClick={handleMessageHost}
                 disabled={conversationMutation.isPending}
-                className="mt-3 h-10 w-full rounded-lg border border-gray-200 px-4 text-[13px] font-semibold text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50 dark:border-white/[0.08] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+                className="button-secondary !w-full !py-3 flex items-center justify-center gap-2"
               >
                 {conversationMutation.isPending
                   ? "Opening chat..."
                   : "Message host"}
               </button>
 
-              <p className="mt-3 text-center text-[12px] text-gray-500 dark:text-gray-400">
-                You will not be charged yet.
+              <p className="mt-5 text-center text-[11px] font-bold text-[var(--text-sub)] uppercase tracking-widest">
+                No payment needed yet
               </p>
             </div>
           </aside>
@@ -561,19 +551,20 @@ export default function ListingDetail() {
 }
 
 function HostAvatar({ listing }: { listing: Listing }) {
+  const name = listing.host?.name || "Host";
   if (listing.host?.avatar) {
     return (
       <img
         src={listing.host.avatar}
-        alt={listing.host.name || "Host"}
-        className="h-12 w-12 shrink-0 rounded-full object-cover"
+        alt={name}
+        className="h-16 w-16 shrink-0 rounded-2xl object-cover ring-4 ring-[var(--bg-sub)] shadow-lg"
       />
     );
   }
 
   return (
-    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gray-100 text-base font-semibold text-gray-700 dark:bg-white/[0.08] dark:text-gray-200">
-      {(listing.host?.name || "H").charAt(0).toUpperCase()}
+    <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-[var(--bg-sub)] border border-[var(--border-main)] text-xl font-black text-[var(--text-main)] shadow-lg">
+      {name.charAt(0).toUpperCase()}
     </div>
   );
 }
@@ -588,13 +579,15 @@ function Fact({
   value: string;
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-lg bg-gray-50 px-4 py-3 dark:bg-white/[0.04]">
-      <Icon className="h-4 w-4 text-gray-700 dark:text-gray-300" />
+    <div className="flex items-center gap-4 rounded-2xl bg-[var(--bg-sub)] p-5 border border-[var(--border-main)] transition-all hover:premium-shadow group">
+      <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--bg-main)] text-[var(--text-sub)] group-hover:text-[var(--color-primary)] transition-all">
+        <Icon className="h-5 w-5" />
+      </div>
       <div>
-        <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">
+        <p className="text-[10px] font-black uppercase tracking-widest text-[var(--text-sub)]">
           {label}
         </p>
-        <p className="mt-0.5 text-[14px] font-semibold capitalize text-gray-950 dark:text-white">
+        <p className="mt-1 text-[15px] font-bold capitalize text-[var(--text-main)]">
           {value}
         </p>
       </div>

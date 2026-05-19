@@ -67,7 +67,7 @@ import { authenticate, requireAdmin } from "../../middlewares/auth.middleware";
  *           example: alice
  *         password:
  *           type: string
- *           example: mypassword123
+ *           example: Password123!
  *         role:
  *           type: string
  *           enum: [host, guest]
@@ -81,10 +81,10 @@ import { authenticate, requireAdmin } from "../../middlewares/auth.middleware";
  *       properties:
  *         email:
  *           type: string
- *           example: alice@example.com
+ *           example: sandrah@example.com
  *         password:
  *           type: string
- *           example: mypassword123
+ *           example: Password123!
  *
  *     AuthResponse:
  *       type: object

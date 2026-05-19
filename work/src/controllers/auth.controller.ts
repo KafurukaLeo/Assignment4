@@ -306,7 +306,10 @@ export const assignRole = async (req: Request, res: Response) => {
   try {
     const updatedUser = await prisma.user.update({
       where: { id: userId },
-      data: { role: role as any },
+      data: { 
+        role: role as any,
+        ...(role === 'guest' && { hostStatus: 'pending' })
+      },
     });
     const { password: _, resetToken: __, resetTokenExpiry: ___, ...userWithoutPassword } = updatedUser as any;
     res.json({ message: 'Role updated', user: userWithoutPassword });

@@ -1,6 +1,6 @@
 import type { Response } from "express";
 import prisma from "../config/prisma";
-import { model } from "../config/ai";
+import { model, deterministicModel } from "../config/ai";
 import type { AuthRequest } from "../middlewares/auth.middleware";
 import { getCache, setCache } from "../config/catche";
 import { formatListing } from "../utils/listing";
@@ -21,9 +21,14 @@ const chatSessions = new Map<string, Session>();
  * so we use a regex to find the first { ... } block and parse it.
  */
 const parseAiJson = (content: unknown): any => {
-  const text = typeof content === "string" ? content : JSON.stringify(content);
-  const match = text.match(/\{[\s\S]*\}/);
-  return JSON.parse(match ? match[0] : text);
+  try {
+    const text = typeof content === "string" ? content : JSON.stringify(content);
+    const match = text.match(/\{[\s\S]*\}/);
+    return JSON.parse(match ? match[0] : text);
+  } catch (err) {
+    console.error("Failed to parse AI JSON:", err);
+    throw new Error("Invalid JSON format returned by AI");
+  }
 };
 
 /**
@@ -40,7 +45,7 @@ const handleAiError = (error: any, res: Response): boolean => {
     res.status(429).json({ error: "AI service is busy, please try again in a moment" });
     return true;
   }
-  if (status === 401 || message.includes("401") || message.toLowerCase().includes("invalid api key")) {
+  if (status === 401 || message.includes("401") || message.toLowerCase().includes("invalid api key") || message.toLowerCase().includes("unauthorized")) {
     res.status(500).json({ error: "AI service configuration error" });
     return true;
   }
@@ -64,13 +69,18 @@ export const smartSearch = async (req: AuthRequest, res: Response) => {
     const limit = parseInt(Array.isArray(req.query["limit"]) ? req.query["limit"][0] as string : req.query["limit"] as string) || 10;
     const skip = (page - 1) * limit;
 
-    // Ask AI to extract filters from the natural language query
+    // Ask AI to extract filters from the natural language query using the deterministic (T=0) model
     let aiResponse;
     try {
-      aiResponse = await model.invoke(`
-        Extract filters from the following text and return ONLY JSON.
+      aiResponse = await deterministicModel.invoke(`
+        Extract filters from the following search query and return ONLY JSON.
         Text: "${query}"
-        Format: { "location": string | null, "type": "apartment" | "house" | "villa" | "cabin" | null, "maxPrice": number | null, "guests": number | null }
+        
+        Format: { "location": string | null, "type": "APARTMENT" | "HOUSE" | "VILLA" | "CABIN" | null, "maxPrice": number | null, "guests": number | null }
+        
+        Rules:
+        - If a filter is not mentioned or cannot be inferred, set it to null.
+        - Normalize type to uppercase matching the values: "APARTMENT", "HOUSE", "VILLA", "CABIN".
       `);
     } catch (aiError) {
       if (handleAiError(aiError, res)) return;
@@ -87,25 +97,50 @@ export const smartSearch = async (req: AuthRequest, res: Response) => {
 
     // If all filters are null, the query was too vague — ask user to be more specific
     const allNull = Object.values(filters).every((v) => v === null);
-    if (allNull) return res.status(400).json({ error: "Could not extract any filters from your query, please be more specific" });
+    if (allNull) {
+      return res.status(400).json({ error: "Could not extract any filters from your query, please be more specific" });
+    }
 
     // Build Prisma where clause from extracted filters
     const where: any = {};
-    if (filters.location) where.location = { contains: filters.location };
-    if (filters.type) where.type = filters.type;
-    if (filters.maxPrice) where.pricePerNight = { lte: filters.maxPrice };
-    if (filters.guests) where.guests = { gte: filters.guests };
+    if (filters.location) {
+      where.location = { contains: filters.location };
+    }
+    if (filters.type) {
+      where.type = filters.type.toLowerCase(); // Map uppercase type back to lowercase for SQLite seed values
+    }
+    if (filters.maxPrice != null && !isNaN(Number(filters.maxPrice))) {
+      where.pricePerNight = { lte: Number(filters.maxPrice) };
+    }
+    if (filters.guests != null && !isNaN(Number(filters.guests))) {
+      where.guests = { gte: Number(filters.guests) };
+    }
 
     // Run both queries in parallel for performance
     const [listings, total] = await Promise.all([
-      prisma.listing.findMany({ where, skip, take: limit, include: { host: { select: { name: true, email: true } } } }),
+      prisma.listing.findMany({ 
+        where, 
+        skip, 
+        take: limit, 
+        include: { host: { select: { name: true, email: true } } } 
+      }),
       prisma.listing.count({ where }),
     ]);
 
     res.status(200).json({ 
-      filters, 
+      filters: {
+        location: filters.location || null,
+        type: filters.type || null,
+        maxPrice: filters.maxPrice || null,
+        guests: filters.guests || null
+      }, 
       data: listings.map(formatListing), 
-      meta: { total, page, limit, totalPages: Math.ceil(total / limit) } 
+      meta: { 
+        total, 
+        page, 
+        limit, 
+        totalPages: Math.ceil(total / limit) 
+      } 
     });
   } catch (error) {
     console.error(error);
@@ -117,7 +152,7 @@ export const smartSearch = async (req: AuthRequest, res: Response) => {
  * POST /api/v1/ai/listings/:id/generate-description
  * Description Generator — generates an AI-written description for a listing.
  * Requires authentication. Only the listing owner (host) can generate a description.
- * Accepts a "tone" field: "professional", "casual", or "luxury".
+ * Accepts an optional "tone" field: "professional", "casual", or "luxury".
  * The generated description is saved to the database and returned in the response.
  */
 export const generateDescription = async (req: AuthRequest, res: Response) => {
@@ -127,41 +162,69 @@ export const generateDescription = async (req: AuthRequest, res: Response) => {
 
     // Validate tone — only these three values are accepted
     const validTones = ["professional", "casual", "luxury"];
-    if (!validTones.includes(tone)) return res.status(400).json({ error: "Invalid tone. Must be one of: professional, casual, luxury" });
+    if (!validTones.includes(tone)) {
+      return res.status(400).json({ error: "Invalid tone. Must be one of: professional, casual, luxury" });
+    }
 
     // Fetch the listing and verify it exists
-    const listing = await prisma.listing.findUnique({ where: { id: String(id) }, include: { host: true } });
+    const listing = await prisma.listing.findUnique({ where: { id }, include: { host: true } });
     if (!listing) return res.status(404).json({ error: "Listing not found" });
 
     // Only the host who owns this listing can generate a description
-    if (listing.hostId !== req.userId) return res.status(403).json({ error: "Not authorized to modify this listing" });
+    if (listing.hostId !== req.userId) {
+      return res.status(403).json({ error: "Not authorized to modify this listing" });
+    }
 
-    // Different prompt prefixes based on the requested tone
-    const prefixes: Record<string, string> = {
-      professional: "Write a professional, clear, and business-like description for the following listing:",
-      casual: "Write a friendly, relaxed, and conversational description for the following listing:",
-      luxury: "Write an elegant, premium, and aspirational description for the following listing:",
+    // Different prompts based on the requested tone
+    const prompts: Record<string, string> = {
+      professional: `Write a professional, clear, and business-like description for the following listing:
+Title: ${listing.title}
+Location: ${listing.location}
+Price: $${listing.pricePerNight}/night
+Amenities: ${listing.amenities}
+Type: ${listing.type}
+
+Ensure the tone is formal, professional, elegant yet extremely direct and focused on core values and business-like clarity. Highlight all features cleanly.`,
+      casual: `Write a friendly, relaxed, and conversational description for the following listing:
+Title: ${listing.title}
+Location: ${listing.location}
+Price: $${listing.pricePerNight}/night
+Amenities: ${listing.amenities}
+Type: ${listing.type}
+
+Ensure the tone is warm, friendly, casual, and highly conversational. Make the guest feel instantly welcome and relaxed, like talking to a close friend.`,
+      luxury: `Write an elegant, premium, and aspirational description for the following listing:
+Title: ${listing.title}
+Location: ${listing.location}
+Price: $${listing.pricePerNight}/night
+Amenities: ${listing.amenities}
+Type: ${listing.type}
+
+Ensure the tone is sophisticated, premium, extremely luxurious, and aspirational. Use high-end descriptors, elaborate language, and evoke an exceptional, exclusive experience.`,
     };
 
-    // Call the AI model with the tone-specific prompt
+    // Call the creative AI model (T=0.7) with the tone-specific prompt
     let aiResponse;
     try {
-      aiResponse = await model.invoke(`${prefixes[tone]}\n\nTitle: ${listing.title}\n\nPlease generate a compelling description that highlights the key features and appeal of this property.`);
+      aiResponse = await model.invoke(prompts[tone]!);
     } catch (aiError) {
       if (handleAiError(aiError, res)) return;
       return res.status(500).json({ error: "AI service unavailable" });
     }
 
-    const generatedDescription = typeof aiResponse.content === "string" ? aiResponse.content : JSON.stringify(aiResponse.content);
+    const generatedDescription = typeof aiResponse.content === "string" ? aiResponse.content.trim() : JSON.stringify(aiResponse.content).trim();
 
     // Save the generated description to the database
     const updatedListing = await prisma.listing.update({
-      where: { id: String(id) },
+      where: { id },
       data: { description: generatedDescription },
-      include: { host: { select: { name: true, email: true } } },
+      include: { host: { select: { id: true, name: true, email: true } } },
     });
 
-    res.status(200).json({ description: generatedDescription, listing: formatListing(updatedListing) });
+    res.status(200).json({ 
+      description: generatedDescription, 
+      listing: formatListing(updatedListing) 
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Something went wrong" });
@@ -183,7 +246,9 @@ export const chat = async (req: AuthRequest, res: Response) => {
     const { sessionId, listingId, message } = req.body;
 
     // Both sessionId and message are required
-    if (!sessionId || !message) return res.status(400).json({ error: "sessionId and message are required" });
+    if (!sessionId || !message) {
+      return res.status(400).json({ error: "sessionId and message are required" });
+    }
 
     // Get existing session or create a new one
     let session = chatSessions.get(sessionId);
@@ -192,50 +257,78 @@ export const chat = async (req: AuthRequest, res: Response) => {
       chatSessions.set(sessionId, session);
     }
 
-    // If a new listingId is provided, fetch that listing and reset history
-    if (session.listing && session.listingId !== listingId) {
-      session.listingId = listingId;
-      session.history = [];
-      const rawListing = await prisma.listing.findUnique({ where: { id: listingId } });
-      session.listing = formatListing(rawListing);
-    } else if (listingId && !session.listing) {
-      // Listing ID is the same but listing data wasn't fetched yet
-      const rawListing = await prisma.listing.findUnique({ where: { id: listingId } });
-      session.listing = formatListing(rawListing);
+    // Check if listingId has changed in the request compared to what's stored in session
+    const normalizedListingId = listingId || null;
+    if (normalizedListingId !== session.listingId) {
+      session.listingId = normalizedListingId;
+      session.history = []; // Reset conversation history when context switches
+      if (normalizedListingId) {
+        const rawListing = await prisma.listing.findUnique({ where: { id: normalizedListingId } });
+        session.listing = rawListing ? formatListing(rawListing) : null;
+      } else {
+        session.listing = null;
+      }
     }
 
-    // Build system prompt — if listing context exists, include its details
-    let systemPrompt = "You are a helpful guest support assistant for an Airbnb-like platform.\nAnswer general questions about the platform and help with common inquiries.";
+    // Build system prompt — if listing context exists, include its details precisely using the requested template
+    let systemPrompt = "";
     if (session.listing) {
-      const amenities = Array.isArray(session.listing.amenities) ? session.listing.amenities.join(", ") : "None";
+      const amenities = Array.isArray(session.listing.amenities)
+        ? session.listing.amenities.join(", ")
+        : typeof session.listing.amenities === "string"
+        ? session.listing.amenities
+        : "None";
+
       systemPrompt = `You are a helpful guest support assistant for an Airbnb-like platform.
 You are currently helping a guest with questions about this specific listing:
-Title: ${session.listing.title} | Location: ${session.listing.location} | Price: $${session.listing.pricePerNight}/night | Guests: ${session.listing.guests} | Type: ${session.listing.type} | Amenities: ${amenities}
-Answer questions accurately based on the details above. If asked something not in the listing details, say you don't have that information.`;
+
+Title: ${session.listing.title}
+Location: ${session.listing.location}
+Price per night: $${session.listing.pricePerNight}
+Max guests: ${session.listing.guests}
+Type: ${session.listing.type}
+Amenities: ${amenities}
+Description: ${session.listing.description}
+
+Answer questions about this listing accurately based on the details above.
+If asked something not covered by the listing details, say you don't have that information.`;
+    } else {
+      systemPrompt = `You are a helpful guest support assistant for an Airbnb-like platform.
+Answer general questions about the platform and help with common inquiries.`;
     }
 
-    // Add the user's message to history before calling AI
+    // Push the user's new message to the history
     session.history.push({ role: "user", content: message });
 
-    // Build the full prompt from system prompt + last 20 messages of history
-    const historyText = session.history.slice(-20).map(m => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`).join("\n");
+    // Build history text from the last 20 messages of the history
+    const historyText = session.history
+      .slice(-20)
+      .map(m => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
+      .join("\n");
 
     let aiResponse;
     try {
+      // Call creative model (T=0.7)
       aiResponse = await model.invoke(`${systemPrompt}\n\n${historyText}\nAssistant:`);
     } catch (aiError) {
       if (handleAiError(aiError, res)) return;
       return res.status(500).json({ error: "AI service unavailable" });
     }
 
-    const aiText = typeof aiResponse.content === "string" ? aiResponse.content : JSON.stringify(aiResponse.content);
+    const aiText = typeof aiResponse.content === "string" ? aiResponse.content.trim() : JSON.stringify(aiResponse.content).trim();
 
-    // Add AI response to history and enforce the 20-message limit
+    // Add assistant's response to history and strictly enforce the last 20 messages limit
     session.history.push({ role: "assistant", content: aiText });
-    if (session.history.length > 20) session.history = session.history.slice(-20);
+    if (session.history.length > 20) {
+      session.history = session.history.slice(-20);
+    }
     chatSessions.set(sessionId, session);
 
-    res.status(200).json({ response: aiText, sessionId, messageCount: session.history.length });
+    res.status(200).json({ 
+      response: aiText, 
+      sessionId, 
+      messageCount: session.history.length 
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Something went wrong" });
@@ -260,12 +353,12 @@ export const reviewSummary = async (req: AuthRequest, res: Response) => {
     if (cached) return res.status(200).json(cached);
 
     // Verify the listing exists
-    const listing = await prisma.listing.findUnique({ where: { id: String(id) } });
+    const listing = await prisma.listing.findUnique({ where: { id } });
     if (!listing) return res.status(404).json({ error: "Listing not found" });
 
     // Fetch all reviews with reviewer name
     const reviews = await prisma.review.findMany({
-      where: { listingId: String(id) },
+      where: { listingId: id },
       include: { user: { select: { name: true } } },
     });
 
@@ -279,12 +372,12 @@ export const reviewSummary = async (req: AuthRequest, res: Response) => {
     const totalReviews = reviews.length;
 
     // Format reviews into readable text for the AI prompt
-    const reviewsText = reviews.map(r => `- ${(r as any).user.name} (${r.rating}/5): ${r.comment || "No comment"}`).join("\n");
+    const reviewsText = reviews.map(r => `- ${r.user.name} (${r.rating}/5): ${r.comment || "No comment"}`).join("\n");
 
-    // Ask AI to analyze the reviews and return structured JSON
+    // Ask AI to analyze the reviews and return structured JSON using T=0 deterministic model
     let aiResponse;
     try {
-      aiResponse = await model.invoke(`You are a review analyst. Analyze the following guest reviews and return ONLY a JSON object.
+      aiResponse = await deterministicModel.invoke(`You are a review analyst. Analyze the following guest reviews and return ONLY a JSON object.
 
 Reviews:
 ${reviewsText}
@@ -309,8 +402,8 @@ Return ONLY JSON in this exact format:
 
     const response = {
       summary: aiResult.summary,
-      positives: aiResult.positives ?? [],
-      negatives: aiResult.negatives ?? [],
+      positives: aiResult.positives || [],
+      negatives: aiResult.negatives || [],
       averageRating,   // calculated from DB, not AI
       totalReviews,    // total number of reviews in DB
     };
@@ -358,14 +451,14 @@ export const recommend = async (req: AuthRequest, res: Response) => {
 
     // Format booking history as readable text for the AI prompt
     const bookingHistorySummary = recentBookings.map(b => {
-      const l = (b as any).listing;
+      const l = b.listing;
       return `- Title: "${l.title}" | Location: "${l.location}" | Type: ${l.type} | Price: $${l.pricePerNight}/night | Guests: ${l.guests}`;
     }).join("\n");
 
-    // Ask AI to analyze booking history and suggest search filters
+    // Ask AI to analyze booking history and suggest search filters using the T=0 model
     let aiResponse;
     try {
-      aiResponse = await model.invoke(`Analyze the following booking history and return ONLY a JSON object.
+      aiResponse = await deterministicModel.invoke(`Analyze the following booking history and return ONLY a JSON object.
 
 Booking History (most recent first):
 ${bookingHistorySummary}
@@ -400,24 +493,37 @@ Return ONLY JSON in this exact format:
 
     // Build Prisma where clause — always exclude already-booked listings
     const where: any = { id: { notIn: bookedListingIds } };
-    const filters = aiAnalysis.searchFilters ?? {};
+    const filters = aiAnalysis.searchFilters || {};
 
-    if (filters.location) where.location = { contains: filters.location };
-    if (filters.type) where.type = filters.type;
-    if (filters.maxPrice != null) where.pricePerNight = { lte: filters.maxPrice };
-    if (filters.guests != null) where.guests = { gte: filters.guests };
+    if (filters.location) {
+      where.location = { contains: filters.location };
+    }
+    if (filters.type) {
+      where.type = filters.type.toLowerCase(); // Ensure matching lowercase in database
+    }
+    if (filters.maxPrice != null && !isNaN(Number(filters.maxPrice))) {
+      where.pricePerNight = { lte: Number(filters.maxPrice) };
+    }
+    if (filters.guests != null && !isNaN(Number(filters.guests))) {
+      where.guests = { gte: Number(filters.guests) };
+    }
 
     // Fetch up to 10 recommended listings
     const recommendations = await prisma.listing.findMany({
       where,
       take: 10,
-      include: { host: { select: { name: true, email: true } } },
+      include: { host: { select: { id: true, name: true, email: true } } },
     });
 
     res.status(200).json({
       preferences: aiAnalysis.preferences,
       reason: aiAnalysis.reason,
-      searchFilters: aiAnalysis.searchFilters,
+      searchFilters: {
+        location: filters.location || null,
+        type: filters.type ? filters.type.toUpperCase() : null, // keep uppercase type in filters response for expected API output format
+        maxPrice: filters.maxPrice || null,
+        guests: filters.guests || null
+      },
       recommendations: recommendations.map(formatListing),
     });
   } catch (error) {

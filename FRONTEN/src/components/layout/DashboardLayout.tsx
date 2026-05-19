@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
 import { useAuthStore } from "../../store/auth.store";
@@ -9,8 +9,13 @@ export default function DashboardLayout() {
   const [isOpen, setIsOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<boolean>(false);
   const { user } = useAuthStore();
+  const location = useLocation();
+  const isHostOnlyRoute = ["/dashboard/listings", "/dashboard/bookings"].includes(location.pathname);
   const isBlockedHost =
-    user?.role === "host" && user.hostStatus && user.hostStatus !== "approved";
+    user?.role === "host" &&
+    user.hostStatus &&
+    user.hostStatus !== "approved" &&
+    isHostOnlyRoute;
 
   return (
     <div className="flex min-h-screen bg-[#F7F7F7] dark:bg-[#111]">
@@ -41,7 +46,7 @@ export default function DashboardLayout() {
   );
 }
 
-function HostStatusNotice({ status }: { status: "pending" | "restricted" }) {
+export function HostStatusNotice({ status }: { status: "pending" | "restricted" }) {
   const isPending = status === "pending";
   const Icon = isPending ? Clock3 : ShieldAlert;
 

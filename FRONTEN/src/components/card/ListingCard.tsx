@@ -73,14 +73,14 @@ export default function ListingCard({ listing, type }: ListingCardProps) {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.25 }}
-        className="group flex rounded-2xl overflow-hidden border border-gray-100 dark:border-white/[0.07] bg-white dark:bg-[#1a1f2b] hover:border-gray-200 dark:hover:border-white/[0.12] hover:shadow-md hover:shadow-black/[0.05] transition-all duration-200"
+        className="group flex rounded-2xl overflow-hidden border border-[var(--border-main)] bg-[var(--bg-main)] hover:premium-shadow-lg transition-all duration-300"
       >
         <Link
           to={`/listings/${listing.id}`}
           className="relative shrink-0 w-44 sm:w-56 overflow-hidden"
         >
           <div
-            className={`absolute inset-0 bg-gray-100 dark:bg-white/[0.05] transition-opacity duration-500 pointer-events-none ${imgLoaded ? "opacity-0" : "opacity-100"}`}
+            className={`absolute inset-0 bg-[var(--bg-sub)] transition-opacity duration-500 pointer-events-none ${imgLoaded ? "opacity-0" : "opacity-100"}`}
           />
           <img
             src={getImageUrl(listing.photos?.[0])}
@@ -89,9 +89,9 @@ export default function ListingCard({ listing, type }: ListingCardProps) {
             decoding="async"
             onLoad={() => setImgLoaded(true)}
             onError={() => setImgLoaded(true)}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
           />
-          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300 pointer-events-none" />
+          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-300 pointer-events-none" />
         </Link>
 
         <div className="flex flex-col justify-between flex-1 p-5 min-w-0">
@@ -99,14 +99,14 @@ export default function ListingCard({ listing, type }: ListingCardProps) {
             <div className="flex items-start justify-between gap-3 mb-2">
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5 mb-1.5">
-                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-[var(--text-sub)]">
                     {listing.type ?? "Stay"}
                   </span>
                   {listing.host && (
                     <BadgeCheck className="w-3.5 h-3.5 text-emerald-500" />
                   )}
                 </div>
-                <h2 className="text-[15px] font-semibold text-gray-900 dark:text-white truncate">
+                <h2 className="font-heading text-[16px] font-semibold text-[var(--text-main)] truncate">
                   {listing.title}
                 </h2>
               </div>
@@ -115,49 +115,48 @@ export default function ListingCard({ listing, type }: ListingCardProps) {
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.85 }}
                 onClick={handleToggleFavorite}
-                className="shrink-0 w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 dark:border-white/[0.1] hover:border-red-200 dark:hover:border-red-500/30 transition-colors"
+                className="shrink-0 w-8.5 h-8.5 flex items-center justify-center rounded-full border border-[var(--border-main)] hover:border-[var(--color-primary)]/30 hover:bg-[var(--color-primary)]/5 transition-all"
                 aria-label={
                   isLiked ? "Remove from favorites" : "Save to favorites"
                 }
               >
                 <Heart
-                  className={`w-3.5 h-3.5 transition-colors ${
-                    isLiked ? "fill-red-500 stroke-red-500" : "text-gray-400"
+                  className={`w-3.5 h-3.5 transition-all ${
+                    isLiked ? "fill-[var(--color-primary)] text-[var(--color-primary)]" : "text-[var(--text-sub)]"
                   }`}
                 />
               </motion.button>
             </div>
 
-            <p className="flex items-center gap-1.5 text-[12px] text-gray-400 mb-3">
+            <p className="flex items-center gap-1.5 text-[12px] text-[var(--text-sub)] mb-3">
               <MapPin className="w-3 h-3 shrink-0" />
               {listing.location}
             </p>
 
-            <p className="text-[13px] text-gray-500 dark:text-gray-400 leading-relaxed line-clamp-2">
+            <p className="text-[13px] text-[var(--text-sub)] leading-relaxed line-clamp-2">
               {listing.description ??
                 "A wonderful place to stay, carefully curated for a comfortable experience."}
             </p>
           </div>
 
-          <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100 dark:border-white/[0.06]">
+          <div className="flex items-center justify-between mt-4 pt-4 border-t border-[var(--border-main)]">
             <div className="flex items-center gap-1.5">
               <Star className="w-3.5 h-3.5 fill-amber-400 stroke-none" />
-              <span className="text-[13px] font-semibold text-gray-900 dark:text-white">
+              <span className="text-[13px] font-bold text-[var(--text-main)]">
                 {listing.rating}
               </span>
-              <span className="text-[12px] text-gray-400">rating</span>
             </div>
 
             <div className="flex items-center gap-3">
               <div className="text-right">
-                <span className="text-[15px] font-bold text-gray-900 dark:text-white">
+                <span className="text-[16px] font-bold text-[var(--text-main)]">
                   ${listing.pricePerNight}
                 </span>
-                <span className="text-[12px] text-gray-400"> /night</span>
+                <span className="text-[12px] text-[var(--text-sub)]"> /night</span>
               </div>
               <Link
                 to={`/listings/${listing.id}`}
-                className="flex items-center gap-1.5 px-3.5 py-2 bg-(--color-primary) text-white text-[12px] font-semibold rounded-xl hover:opacity-90 active:scale-95 transition-all duration-150"
+                className="button-primary !py-1.5 !px-4 !text-[12px] flex items-center gap-1.5"
               >
                 View
                 <ArrowRight className="w-3 h-3" />
@@ -178,10 +177,10 @@ export default function ListingCard({ listing, type }: ListingCardProps) {
     >
       <Link
         to={`/listings/${listing.id}`}
-        className="relative rounded-2xl overflow-hidden aspect-[4/3] block"
+        className="relative rounded-[1.25rem] overflow-hidden aspect-[4/3] block premium-shadow group-hover:premium-shadow-lg transition-all duration-300"
       >
         <div
-          className={`absolute inset-0 bg-gray-100 dark:bg-white/[0.05] transition-opacity duration-500 pointer-events-none ${imgLoaded ? "opacity-0" : "opacity-100 animate-pulse"}`}
+          className={`absolute inset-0 bg-[var(--bg-sub)] transition-opacity duration-500 pointer-events-none ${imgLoaded ? "opacity-0" : "opacity-100 animate-pulse"}`}
         />
 
         <img
@@ -191,15 +190,14 @@ export default function ListingCard({ listing, type }: ListingCardProps) {
           decoding="async"
           onLoad={() => setImgLoaded(true)}
           onError={() => setImgLoaded(true)}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
         />
 
-        <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/30 to-transparent" />
+        <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/40 to-transparent" />
+        <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/50 to-transparent" />
 
-        <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/40 to-transparent" />
-
-        <div className="absolute top-3 left-3">
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-white/90 bg-black/30 backdrop-blur-sm border border-white/20 rounded-full px-2.5 py-1">
+        <div className="absolute top-3.5 left-3.5">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-white bg-black/30 backdrop-blur-md border border-white/20 rounded-full px-3 py-1.5">
             {listing.type ?? "Stay"}
           </span>
         </div>
@@ -208,39 +206,39 @@ export default function ListingCard({ listing, type }: ListingCardProps) {
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.85 }}
           onClick={handleToggleFavorite}
-          className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full bg-white/20 backdrop-blur-sm border border-white/20 hover:bg-white/40 transition-colors"
+          className="absolute top-3.5 right-3.5 w-9 h-9 flex items-center justify-center rounded-full bg-white/10 backdrop-blur-md border border-white/20 hover:bg-white/25 transition-all"
           aria-label={isLiked ? "Remove from favorites" : "Save to favorites"}
         >
           <Heart
-            className={`w-3.5 h-3.5 transition-all ${
-              isLiked ? "fill-red-500 stroke-red-500 scale-110" : "text-white"
+            className={`w-4 h-4 transition-all ${
+              isLiked ? "fill-[var(--color-primary)] text-[var(--color-primary)] scale-110" : "text-white"
             }`}
           />
         </motion.button>
 
-        <div className="absolute bottom-3 right-3">
-          <span className="text-[12px] font-bold text-white bg-black/40 backdrop-blur-sm rounded-lg px-2.5 py-1">
+        <div className="absolute bottom-3.5 right-3.5">
+          <span className="text-[13px] font-bold text-white bg-black/40 backdrop-blur-md border border-white/10 rounded-xl px-3 py-1.5">
             ${listing.pricePerNight}
-            <span className="font-normal opacity-80">/night</span>
+            <span className="font-normal opacity-80 text-[11px]"> /night</span>
           </span>
         </div>
       </Link>
 
-      <div className="pt-3 px-0.5">
+      <div className="pt-3.5 px-1">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <h2 className="text-[14px] font-semibold text-gray-900 dark:text-white truncate leading-snug">
+            <h2 className="font-heading text-[15px] font-semibold text-[var(--text-main)] truncate leading-tight group-hover:text-[var(--color-primary)] transition-colors">
               {listing.title}
             </h2>
-            <p className="flex items-center gap-1 text-[12px] text-gray-400 mt-0.5">
+            <p className="flex items-center gap-1 text-[12px] text-[var(--text-sub)] mt-1">
               <MapPin className="w-3 h-3 shrink-0" />
               <span className="truncate">{listing.location}</span>
             </p>
           </div>
 
-          <div className="flex items-center gap-1 shrink-0 mt-0.5">
-            <Star className="w-3.5 h-3.5 fill-amber-400 stroke-none" />
-            <span className="text-[13px] font-semibold text-gray-900 dark:text-white">
+          <div className="flex items-center gap-1 shrink-0 mt-0.5 bg-[var(--bg-sub)] px-2 py-0.5 rounded-lg border border-[var(--border-main)]">
+            <Star className="w-3 h-3 fill-amber-400 stroke-none" />
+            <span className="text-[12px] font-bold text-[var(--text-main)]">
               {listing.rating}
             </span>
           </div>

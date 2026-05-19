@@ -21,6 +21,8 @@ export function setCache(key: string, data: unknown, ttlSeconds: number): void {
 
 export function deleteCache(prefix: string): void {
   for (const key of store.keys()) {
-    if (key.startsWith(prefix)) store.delete(key);
+    if (key.startsWith(prefix)) {
+      store.delete(key);
+    }
   }
 }

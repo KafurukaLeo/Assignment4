@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useAuthStore } from "../../store/auth.store";
 import { Link } from "react-router-dom";
+import { HostStatusNotice } from "../../components/layout/DashboardLayout";
 
 interface Booking {
   id: string;
@@ -133,36 +134,43 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {role === "admin" && <AdminStats stats={stats} />}
-        {role === "host" && (
-          dashboardMode === "hosting" ? (
-            <HostStats stats={stats} />
-          ) : (
-            <GuestStats stats={{
-              ...stats,
-              totalBookings: (stats as any).guestStats?.totalBookings,
-              totalSpent: (stats as any).guestStats?.totalSpent,
-              recentBookings: (stats as any).recentGuestBookings
-            }} />
-          )
-        )}
-        {role === "guest" && <GuestStats stats={stats} />}
-      </div>
+      {/* Content */}
+      {role === "host" && dashboardMode === "hosting" && user?.hostStatus !== "approved" ? (
+        <HostStatusNotice status={(user?.hostStatus || "pending") as "pending" | "restricted"} />
+      ) : (
+        <>
+          {/* Stats Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {role === "admin" && <AdminStats stats={stats} />}
+            {role === "host" && (
+              dashboardMode === "hosting" ? (
+                <HostStats stats={stats} />
+              ) : (
+                <GuestStats stats={{
+                  ...stats,
+                  totalBookings: (stats as any).guestStats?.totalBookings,
+                  totalSpent: (stats as any).guestStats?.totalSpent,
+                  recentBookings: (stats as any).recentGuestBookings
+                }} />
+              )
+            )}
+            {role === "guest" && <GuestStats stats={stats} />}
+          </div>
 
-      {/* Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <RecentBookings 
-          role={dashboardMode === "traveling" ? "guest" : role} 
-          bookings={(dashboardMode === "traveling" ? (stats as any).recentGuestBookings : stats?.recentBookings) || []} 
-        />
-        {dashboardMode === "hosting" && role !== "guest" ? (
-          <TopListings listings={stats?.topListings || []} />
-        ) : (
-          <GuestQuickActions />
-        )}
-      </div>
+          {/* Content Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <RecentBookings 
+              role={dashboardMode === "traveling" ? "guest" : role} 
+              bookings={(dashboardMode === "traveling" ? (stats as any).recentGuestBookings : stats?.recentBookings) || []} 
+            />
+            {dashboardMode === "hosting" && role !== "guest" ? (
+              <TopListings listings={stats?.topListings || []} />
+            ) : (
+              <GuestQuickActions />
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

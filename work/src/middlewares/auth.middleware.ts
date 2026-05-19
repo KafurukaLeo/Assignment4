@@ -60,9 +60,8 @@ export function requireHost(req: AuthRequest, res: Response, next: NextFunction)
  * Use after authenticate on routes that are guest-only (e.g. create booking).
  */
 export function requireGuest(req: AuthRequest, res: Response, next: NextFunction) {
-  // Allow any authenticated user to book. Hosts can also be guests.
-  if (req.userId) return next();
-  return res.status(403).json({ error: "Authentication required" });
+  if (req.role === "guest" || req.role === "admin") return next();
+  return res.status(403).json({ error: "Hosts are not permitted to make bookings. You can only manage properties." });
 }
 
 /**

@@ -1,5 +1,5 @@
-@import "tailwindcss";
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap');
+@import "tailwindcss";
 
 @custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
 
@@ -44,22 +44,24 @@ h1, h2, h3, h4, .font-heading {
   font-family: 'Outfit', sans-serif;
 }
 
-@layer utilities {
-  .glass {
-    @apply backdrop-blur-xl bg-[var(--glass-bg)] border-[var(--glass-border)];
-  }
-  
-  .premium-shadow {
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-  }
-  
-  .premium-shadow-lg {
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 10px 10px -5px rgba(0, 0, 0, 0.03);
-  }
+@utility glass {
+  backdrop-filter: blur(24px);
+  background-color: var(--glass-bg);
+  border-color: var(--glass-border);
+}
 
-  .text-gradient {
-    @apply bg-clip-text text-transparent bg-linear-to-r from-[var(--color-primary)] to-[#BD1E59];
-  }
+@utility premium-shadow {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+}
+
+@utility premium-shadow-lg {
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 10px 10px -5px rgba(0, 0, 0, 0.03);
+}
+
+@utility text-gradient {
+  background-clip: text;
+  color: transparent;
+  background-image: linear-gradient(to right, var(--color-primary), #BD1E59);
 }
 
 @layer components {

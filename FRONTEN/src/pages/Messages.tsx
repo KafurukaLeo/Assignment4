@@ -106,6 +106,10 @@ export default function Messages() {
       setNewMessage("");
       queryClient.invalidateQueries({ queryKey: ["messages", selectedParticipant?.id] });
       queryClient.invalidateQueries({ queryKey: ["conversations"] });
+    },
+    onError: (err: any) => {
+      const errMsg = err.response?.data?.error || err.response?.data?.message || "Failed to send message";
+      toast.error(errMsg);
     }
   });
 
@@ -124,7 +128,7 @@ export default function Messages() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-140px)] dark:bg-[#0F0F0F] overflow-hidden rounded-2xl border border-[#EBEBEB] dark:border-[#2A2A2A] bg-white">
+    <div className="flex h-[600px] md:h-[680px] dark:bg-[#0F0F0F] overflow-hidden rounded-2xl border border-[#EBEBEB] dark:border-[#2A2A2A] bg-white">
       {/* Sidebar - Conversations List */}
       <div className={`w-full md:w-[380px] flex-shrink-0 border-r border-[#EBEBEB] dark:border-[#2A2A2A] flex flex-col ${selectedParticipant ? 'hidden md:flex' : 'flex'}`}>
         <div className="p-6 border-b border-[#EBEBEB] dark:border-[#2A2A2A]">
@@ -134,7 +138,7 @@ export default function Messages() {
             <input 
               type="text" 
               placeholder="Search messages"
-              className="w-full pl-10 pr-4 py-2.5 bg-[#F7F7F7] dark:bg-[#1A1A1A] border-none rounded-full text-sm focus:ring-2 focus:ring-(--color-primary)"
+              className="w-full pl-10 pr-4 py-2.5 bg-[#F7F7F7] dark:bg-[#1A1A1A] border-none rounded-full text-sm focus:ring-2 focus:ring-[#FF5A5F]"
             />
           </div>
         </div>
@@ -163,7 +167,7 @@ export default function Messages() {
                   {conv.participant.avatar ? (
                     <img src={conv.participant.avatar} className="w-12 h-12 rounded-full object-cover" alt="" />
                   ) : (
-                    <div className="w-12 h-12 rounded-full bg-(--color-primary) text-white flex items-center justify-center font-bold">
+                    <div className="w-12 h-12 rounded-full bg-[#FF5A5F] text-white flex items-center justify-center font-bold">
                       {conv.participant.name[0]}
                     </div>
                   )}
@@ -200,12 +204,12 @@ export default function Messages() {
                   {selectedParticipant.avatar ? (
                     <img src={selectedParticipant.avatar} className="w-10 h-10 rounded-full object-cover" alt="" />
                   ) : (
-                    <div className="w-10 h-10 rounded-full bg-(--color-primary) text-white flex items-center justify-center font-bold">
+                    <div className="w-10 h-10 rounded-full bg-[#FF5A5F] text-white flex items-center justify-center font-bold">
                       {selectedParticipant.name[0]}
                     </div>
                   )}
                   <div>
-                    <h2 className="font-bold">{selectedParticipant.name}</h2>
+                    <h2 className="font-bold text-black dark:text-white">{selectedParticipant.name}</h2>
                     <p className="text-[12px] text-emerald-500 font-medium">Online</p>
                   </div>
                 </div>
@@ -232,14 +236,14 @@ export default function Messages() {
             {/* Messages List */}
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
               {loadingMessages ? (
-                <div className="flex justify-center py-12"><div className="w-8 h-8 border-4 border-(--color-primary) border-t-transparent rounded-full animate-spin" /></div>
+                <div className="flex justify-center py-12"><div className="w-8 h-8 border-4 border-[#FF5A5F] border-t-transparent rounded-full animate-spin" /></div>
               ) : (
                 messages?.map((msg) => {
                   const isMe = msg.senderId === user?.id;
                   return (
                     <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
                       <div className={`max-w-[80%] md:max-w-[70%] ${isMe ? 'order-1' : 'order-2'}`}>
-                        <div className={`p-4 rounded-2xl shadow-sm ${isMe ? 'bg-(--color-primary) text-white rounded-tr-none' : 'bg-white dark:bg-[#1A1A1A] rounded-tl-none'}`}>
+                        <div className={`p-4 rounded-2xl shadow-sm ${isMe ? 'bg-[#FF5A5F] text-white rounded-tr-none' : 'bg-white dark:bg-[#1A1A1A] rounded-tl-none text-black dark:text-white'}`}>
                           <p className="text-sm leading-relaxed">{msg.content}</p>
                         </div>
                         <span className={`text-[10px] text-[#717171] mt-1 block ${isMe ? 'text-right' : 'text-left'}`}>
@@ -262,12 +266,12 @@ export default function Messages() {
                   onChange={(e) => setNewMessage(e.target.value)}
                   placeholder="Type a message..."
                   autoFocus
-                  className="flex-1 px-6 py-4 bg-[#F7F7F7] dark:bg-[#0A0A0A] border-none rounded-2xl text-sm focus:ring-2 focus:ring-(--color-primary)"
+                  className="flex-1 px-6 py-4 bg-[#F7F7F7] dark:bg-[#0A0A0A] border-none rounded-2xl text-sm focus:ring-2 focus:ring-[#FF5A5F] text-black dark:text-white"
                 />
                 <button 
                   type="submit"
                   disabled={!newMessage.trim() || sendMutation.isPending}
-                  className="w-14 h-14 bg-(--color-primary) text-white rounded-2xl flex items-center justify-center hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:hover:scale-100"
+                  className="w-14 h-14 bg-[#FF5A5F] text-white rounded-2xl flex items-center justify-center hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:hover:scale-100 shrink-0"
                 >
                   <Send className="w-6 h-6" />
                 </button>
@@ -277,9 +281,9 @@ export default function Messages() {
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
             <div className="w-24 h-24 bg-white dark:bg-[#1A1A1A] rounded-3xl shadow-xl flex items-center justify-center mb-8 rotate-3 hover:rotate-0 transition-transform">
-              <MessageSquare className="w-12 h-12 text-(--color-primary)" />
+              <MessageSquare className="w-12 h-12 text-[#FF5A5F]" />
             </div>
-            <h2 className="text-2xl font-bold mb-2">Select a conversation</h2>
+            <h2 className="text-2xl font-bold mb-2 text-black dark:text-white">Select a conversation</h2>
             <p className="text-[#717171] max-w-sm">Choose a contact from the list on the left to start chatting with them.</p>
           </div>
         )}

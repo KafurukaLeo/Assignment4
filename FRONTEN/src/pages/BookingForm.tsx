@@ -64,6 +64,11 @@ export default function BookingForm() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (user?.role === "host") {
+      toast.error("Hosts cannot create bookings. Switch to a guest account to book properties.");
+      return;
+    }
+
     if (!checkIn || !checkOut) {
       toast.error("Please select check-in and check-out dates");
       return;
@@ -337,15 +342,21 @@ export default function BookingForm() {
               </div>
             </div>
 
-            <button
-              type="submit"
-              disabled={createBookingMutation.isPending}
-              className="mt-5 w-full rounded-xl bg-(--color-primary) px-5 py-3.5 text-[14px] font-bold text-white shadow-md transition-all hover:bg-(--color-primary-dark) active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {createBookingMutation.isPending
-                ? "Creating request..."
-                : "Reserve"}
-            </button>
+            {user?.role === "host" ? (
+              <div className="mt-5 text-center rounded-2xl bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/20 p-4 text-[13px] font-bold text-amber-700 dark:text-amber-400">
+                Hosts cannot reserve properties. Switch to a guest account to book stays.
+              </div>
+            ) : (
+              <button
+                type="submit"
+                disabled={createBookingMutation.isPending}
+                className="mt-5 w-full rounded-xl bg-(--color-primary) px-5 py-3.5 text-[14px] font-bold text-white shadow-md transition-all hover:bg-(--color-primary-dark) active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {createBookingMutation.isPending
+                  ? "Creating request..."
+                  : "Reserve"}
+              </button>
+            )}
             <p className="mt-3 text-center text-[12px] text-gray-500 dark:text-gray-400">
               You will not be charged yet.
             </p>
